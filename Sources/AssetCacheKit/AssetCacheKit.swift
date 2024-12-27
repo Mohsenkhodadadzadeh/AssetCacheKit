@@ -69,7 +69,7 @@ public struct AssetCacheKit<Loader: AssetLoader, Content: View, Placeholder: Vie
             case .success(let asset):
                 content(asset)
             case .failure(let error):
-                catchError?(error)
+                errorView(error)
             }
         }
     }
