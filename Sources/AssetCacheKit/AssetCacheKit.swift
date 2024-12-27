@@ -68,6 +68,7 @@ public struct AssetCacheKit<Loader: AssetLoader, Content: View, Placeholder: Vie
             }
         }
         .task(id: loader, priority: .userInitiated) {
+            phase = .empty
             await loadAsset()
         }
     }
