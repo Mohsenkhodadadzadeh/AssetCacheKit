@@ -45,7 +45,17 @@ public struct AssetCacheKit<Loader: AssetLoader, Content: View, Placeholder: Vie
     /// A closure that builds the placeholder view to be displayed while the asset is loading.
     let placeholder: () -> Placeholder
     /// A closure that throw errors to a view to be displayed in case the asset downloading faced error.
-    var catchError: ((Error) -> ErrorContent)? = nil
+    let errorView: ((Error) -> ErrorContent)
+    
+    
+    /// Initializes a new `AssetCacheKit` instance.
+    public init(loader: Loader, @ViewBuilder content: @escaping (Loader.Asset) -> Content, @ViewBuilder placeholder: @escaping () -> Placeholder, @ViewBuilder error: @escaping (Error) -> ErrorContent) {
+        self.loader = loader
+        self.content = content
+        self.placeholder = placeholder
+        self.errorView = error
+    }
+    
     public var body: some View {
         Group {
             switch phase {
