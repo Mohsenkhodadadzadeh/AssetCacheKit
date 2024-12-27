@@ -31,7 +31,7 @@ import SwiftUI
 struct ContentView: View {
     var body: some View {
         AssetCacheKit(
-            loader: CachedImageLoader(url: URL(string: "[https://example.com/image.png](https://example.com/image.png)")!),
+            loader: CachedImageLoader(url: URL(string: "https://example.com/image.png")),
             content: { image in
                 image
                     .resizable()
