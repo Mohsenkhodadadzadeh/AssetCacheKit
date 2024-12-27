@@ -34,7 +34,7 @@ import SwiftUI
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
 public struct AssetCacheKit<Loader: AssetLoader, Content: View, Placeholder: View, ErrorContent: View>: View {
     /// The current phase of the asynchronous asset loading process.
-    @State private var phase: AsyncPhase<Loader.Asset> = .empty
+    @State internal var phase: AsyncPhase<Loader.Asset> = .empty
     
     /// The asset loader responsible for fetching the asset.
     let loader: Loader
@@ -45,22 +45,31 @@ public struct AssetCacheKit<Loader: AssetLoader, Content: View, Placeholder: Vie
     /// A closure that builds the placeholder view to be displayed while the asset is loading.
     let placeholder: () -> Placeholder
     /// A closure that throw errors to a view to be displayed in case the asset downloading faced error.
-    var catchError: ((Error) -> ErrorContent)? = nil
+    let errorView: ((Error) -> ErrorContent)
+    
+    
+    /// Initializes a new `AssetCacheKit` instance.
+    public init(loader: Loader, @ViewBuilder content: @escaping (Loader.Asset) -> Content, @ViewBuilder placeholder: @escaping () -> Placeholder, @ViewBuilder error: @escaping (Error) -> ErrorContent) {
+        self.loader = loader
+        self.content = content
+        self.placeholder = placeholder
+        self.errorView = error
+    }
+    
     public var body: some View {
         Group {
             switch phase {
             case .empty:
                 placeholder()
-                    .onAppear {
-                        Task(priority: .userInitiated) {
-                            await loadAsset()
-                        }
-                    }
             case .success(let asset):
                 content(asset)
             case .failure(let error):
-                catchError?(error)
+                errorView(error)
             }
+        }
+        .task(id: loader, priority: .userInitiated) {
+            phase = .empty
+            await loadAsset()
         }
     }
     

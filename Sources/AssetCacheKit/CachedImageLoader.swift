@@ -23,7 +23,7 @@ import SwiftUI
 /// - `SwiftUI`: For image display.
 /// - `Foundation`: For networking (`URLSession`, `URLCache`) and data handling.
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
-public struct CachedImageLoader: AssetLoader {
+public struct CachedImageLoader: AssetLoader, Equatable {
     
     /// The URL of the image to be loaded.
     public let url: URL?
@@ -63,7 +63,7 @@ public struct CachedImageLoader: AssetLoader {
      }
 
     /// Initializes a new `CachedImageLoader` instance.
-     public init(url: URL, urlCache: URLCache = .shared, scale: CGFloat = 1) {
+     public init(url: URL?, urlCache: URLCache = .shared, scale: CGFloat = 1) {
          self.url = url
          let configuration = URLSessionConfiguration.default
          configuration.urlCache = urlCache
@@ -90,6 +90,10 @@ public struct CachedImageLoader: AssetLoader {
  #endif
          throw LoaderError.invalidImageData
      }
+    
+    public static func == (lhs: CachedImageLoader, rhs: CachedImageLoader) -> Bool {
+          return lhs.url == rhs.url && lhs.scale == rhs.scale
+      }
 
     /// Errors that can be thrown by `CachedImageLoader`.
      enum LoaderError: Error {

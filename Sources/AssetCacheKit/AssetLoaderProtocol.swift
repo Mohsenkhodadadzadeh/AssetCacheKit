@@ -10,7 +10,7 @@ import SwiftUI
 /// A protocol defining the contract for an asynchronous asset loader.
 ///
 /// Types conforming to this protocol are responsible for fetching assets of a specific type.
-public protocol AssetLoader: Sendable {
+public protocol AssetLoader: Sendable, Equatable {
     /// The type of the asset being loaded.
     associatedtype Asset: Sendable
     
