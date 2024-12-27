@@ -34,7 +34,7 @@ import SwiftUI
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
 public struct AssetCacheKit<Loader: AssetLoader, Content: View, Placeholder: View, ErrorContent: View>: View {
     /// The current phase of the asynchronous asset loading process.
-    @State private var phase: AsyncPhase<Loader.Asset> = .empty
+    @State internal var phase: AsyncPhase<Loader.Asset> = .empty
     
     /// The asset loader responsible for fetching the asset.
     let loader: Loader
@@ -61,16 +61,14 @@ public struct AssetCacheKit<Loader: AssetLoader, Content: View, Placeholder: Vie
             switch phase {
             case .empty:
                 placeholder()
-                    .onAppear {
-                        Task(priority: .userInitiated) {
-                            await loadAsset()
-                        }
-                    }
             case .success(let asset):
                 content(asset)
             case .failure(let error):
                 errorView(error)
             }
+        }
+        .task(id: loader, priority: .userInitiated) {
+            await loadAsset()
         }
     }
     
