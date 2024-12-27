@@ -63,7 +63,7 @@ public struct CachedImageLoader: AssetLoader {
      }
 
     /// Initializes a new `CachedImageLoader` instance.
-     public init(url: URL, urlCache: URLCache = .shared, scale: CGFloat = 1) {
+     public init(url: URL?, urlCache: URLCache = .shared, scale: CGFloat = 1) {
          self.url = url
          let configuration = URLSessionConfiguration.default
          configuration.urlCache = urlCache
