@@ -23,9 +23,10 @@ import SwiftUI
 ///                 image
 ///                     .resizable()
 ///                     .scaledToFit()
-///             },
-///             placeholder: {
+///             } placeholder: {
 ///                 ProgressView()
+///             } error: { error in
+///                 Text("Error is \(error.localizedDescription)")
 ///             }
 ///         )
 ///     }
