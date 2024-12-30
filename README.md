@@ -1,5 +1,12 @@
 # AssetCacheKit
 
+[![Swift](https://img.shields.io/badge/Swift-6.0-orange?style=flat-square)](https://img.shields.io/badge/Swift-6.0-orange?style=flat-square)
+[![Platforms](https://img.shields.io/badge/Platforms-iOS_15.0-yellow?style=flat-square)](https://img.shields.io/badge/Platforms-iOS_15.0-yellow?style=flat-square)
+[![Platforms](https://img.shields.io/badge/Platforms-macOS_12.0-green?style=flat-square)](https://img.shields.io/badge/Platforms-macOS_12.0-green?style=flat-square)
+[![Platforms](https://img.shields.io/badge/Platforms-tvOS_15.0-khaki?style=flat-square)](https://img.shields.io/badge/Platforms-tvOS_15.0-khaki?style=flat-square)
+[![Platforms](https://img.shields.io/badge/Platforms-watchOS_8.0-red?style=flat-square)](https://img.shields.io/badge/Platforms-watchOS_8.0-red?style=flat-square)
+[![Swift Package Manager](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange?style=flat-square)](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange?style=flat-square)
+
 **A Swift package that provides a generic and efficient way to asynchronously load and cache assets in SwiftUI applications.**
 
 ## Overview
