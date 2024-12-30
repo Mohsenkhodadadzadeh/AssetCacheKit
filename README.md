@@ -40,7 +40,7 @@ struct ContentView: View {
             placeholder: {
                 ProgressView()
             },
-            catchError: { error in
+            error: { error in
                 Text("Error: \(error.localizedDescription)")
             }
         )
