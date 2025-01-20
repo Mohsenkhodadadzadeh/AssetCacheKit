@@ -137,7 +137,6 @@ public struct CachedPDFLoader: AssetLoader, Equatable {
     /// - Returns: The cached PDF data if it exists in the cache, otherwise `nil`.
     private func cachedPDFData(from request: URLRequest, cache: URLCache) -> Data? {
         guard let cachedResponse = cache.cachedResponse(for: request) else { return nil }
-        print("Returning cached PDF data")
         return cachedResponse.data
     }
 
