@@ -17,18 +17,15 @@ import SwiftUI
 /// ```swift
 /// struct ContentView: View {
 ///     var body: some View {
-///         AssetCacheKit(
-///             loader: CachedImageLoader(url: URL(string: "https://example.come/example.png")!),
-///             content: { image in
-///                 image
-///                     .resizable()
-///                     .scaledToFit()
-///             } placeholder: {
-///                 ProgressView()
-///             } error: { error in
-///                 Text("Error is \(error.localizedDescription)")
-///             }
-///         )
+///         AssetCacheKit(loader: CachedImageLoader(url: URL(string: "https://example.come/example.png"))) { image in
+///             image
+///               .resizable()
+///               .scaledToFit()
+///         } placeholder: {
+///             ProgressView()
+///         } error: { error in
+///             Text("Error is \(error.localizedDescription)")
+///         }
 ///     }
 /// }
 /// ```
