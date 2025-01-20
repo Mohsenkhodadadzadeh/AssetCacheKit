@@ -58,7 +58,6 @@ public struct CachedImageLoader: AssetLoader, Equatable {
          if let cachedResponse = CachedURLResponse(response: httpResponse, data: data) as? CachedURLResponse {
              urlCache.storeCachedResponse(cachedResponse, for: urlRequest)
          }
-         print("return from network")
          return try image(from: data)
      }
 
@@ -74,7 +73,6 @@ public struct CachedImageLoader: AssetLoader, Equatable {
 
      private func cachedImage(from request: URLRequest, cache: URLCache) throws -> Image? {
          guard let cachedResponse = cache.cachedResponse(for: request) else { return nil }
-         print("return from cache")
          return try image(from: cachedResponse.data)
      }
 
