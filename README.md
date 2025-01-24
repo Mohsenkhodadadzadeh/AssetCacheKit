@@ -1,6 +1,6 @@
 # AssetCacheKit
 
-![Alt text](readmeAssets/AssetCacheKit.jpg)
+![Alt text](readmeAssets/AssetCacheKit.png)
 
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange?style=flat-square)](https://img.shields.io/badge/Swift-6.0-orange?style=flat-square)
 [![Platforms](https://img.shields.io/badge/Platforms-iOS_15.0-yellow?style=flat-square)](https://img.shields.io/badge/Platforms-iOS_15.0-yellow?style=flat-square)
