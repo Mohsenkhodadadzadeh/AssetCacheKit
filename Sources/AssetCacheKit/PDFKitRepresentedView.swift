@@ -74,7 +74,7 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
     /// myPDF
     ///     .autoScale(false)
     /// ```
-    func autoScale(_ scale: Bool) -> Self {
+    public func autoScale(_ scale: Bool) -> Self {
         var copy = self
         copy.autoScale = scale
         return copy
@@ -98,7 +98,7 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
     /// myPDF
     ///     .displayMode(.twoUpContinuous)
     /// ```
-    func displayMode(_ mode: PDFDisplayMode) -> Self {
+    public func displayMode(_ mode: PDFDisplayMode) -> Self {
         var copy = self
         copy.displayMode = mode
         return copy
@@ -123,7 +123,7 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
     /// myPDF
     ///     .displayDirection(.vertical)
     /// ```
-    func displayDirection(_ direction: PDFDisplayDirection) -> Self {
+    public func displayDirection(_ direction: PDFDisplayDirection) -> Self {
         var copy = self
         copy.displayDirection = direction
         return copy
@@ -197,7 +197,7 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
     /// myPDF
     ///     .autoScale(false)
     /// ```
-    func autoScale(_ scale: Bool) -> Self {
+    public func autoScale(_ scale: Bool) -> Self {
         var copy = self
         copy.autoScale = scale
         return copy
@@ -221,7 +221,7 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
     /// myPDF
     ///     .displayMode(.twoUpContinuous)
     /// ```
-    func displayMode(_ mode: PDFDisplayMode) -> Self {
+    public func displayMode(_ mode: PDFDisplayMode) -> Self {
         var copy = self
         copy.displayMode = mode
         return copy
@@ -246,7 +246,7 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
     /// myPDF
     ///     .displayDirection(.vertical)
     /// ```
-    func displayDirection(_ direction: PDFDisplayDirection) -> Self {
+    public func displayDirection(_ direction: PDFDisplayDirection) -> Self {
         var copy = self
         copy.displayDirection = direction
         return copy
