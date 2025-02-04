@@ -68,16 +68,24 @@ struct ContentView: View {
         AssetCacheKit(loader: CachedPDFLoader(url: URL(string: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf")))
         { pdf in
             pdf
+                .autoScale(true)               // Automatically scales the PDF to fit the view
+                .displayMode(.twoUpContinuous) // Displays the PDF with two pages side by side and continuous scrolling
+                .displayDirection(.vertical)   // Makes the PDF scroll vertically
         } placeholder: {
             Text("Loading...")
         } error: { err in
-            Text("error is : \(err)")
+            Text("Error is: \(err)")
         }
     }
 }
 ```
 
-The CachedPDFLoader works similarly to the image loader but for PDF documents. It loads and caches the PDF file and displays it in a SwiftUI view.
+The CachedPDFLoader works similarly to the image loader but for PDF documents. It loads and caches the PDF file and displays it in a SwiftUI view. Here are some view modifiers you can apply:
+ - **autoScale(true):** Automatically scales the PDF to fit the view’s dimensions.
+ - **displayMode(_:):** Sets how the PDF pages are displayed (e.g., `.singlePage`, `.twoUpContinuous`).
+ - **displayDirection(_:):** Specifies the scroll direction of the PDF pages (e.g., `.horizontal`, `.vertical`).
+ 
+These modifiers allow for customization of how the PDF is presented and interacted with in your app.
 
 
 ## Custom Asset Loaders
