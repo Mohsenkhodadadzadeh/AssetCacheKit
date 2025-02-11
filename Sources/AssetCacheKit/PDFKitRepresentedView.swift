@@ -34,6 +34,10 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
     /// - Default: `.horizontal`
     var displayDirection: PDFDisplayDirection = .horizontal
     
+    @Binding var currentPage: Int?
+    @Binding var totalPages: Int?
+    
+    
     /// Creates the `PDFView` instance.
     ///
     /// This method is called once when the view is first created. It configures the `PDFView` with default settings and
@@ -47,6 +51,13 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
         pdfView.displayMode = .singlePageContinuous
         pdfView.displayDirection = .horizontal
         pdfView.document = document
+        pdfView.delegate = context.coordinator
+        if let totalPages = pdfView.document?.pageCount {
+            DispatchQueue.main.async {
+                self.totalPages = totalPages
+            }
+        }
+       
         return pdfView
     }
 
@@ -63,6 +74,10 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
         pdfView.displayMode = displayMode
         pdfView.displayDirection = displayDirection
         pdfView.document = document
+    }
+    
+    public func makeCoordinator() -> Coordinator {
+        return Coordinator(parent: self)
     }
     
     /// Sets whether the `PDFView` should automatically scale the document.
@@ -126,6 +141,18 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
     public func displayDirection(_ direction: PDFDisplayDirection) -> Self {
         var copy = self
         copy.displayDirection = direction
+        return copy
+    }
+    
+    func totalPage(_ totalPages: Binding<Int?>) -> Self {
+        var copy = self
+        copy._totalPages = totalPages
+        return copy
+    }
+
+    func currentPage(_ currentPage: Binding<Int?>) -> Self {
+        var copy = self
+        copy._currentPage = currentPage
         return copy
     }
     
@@ -157,6 +184,11 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
     ///
     /// - Default: `.horizontal`
     var displayDirection: PDFDisplayDirection = .horizontal
+    
+    @Binding var currentPage: Int?
+    @Binding var totalPages: Int?
+    
+    
     /// Creates the `PDFView` instance.
     ///
     /// This method is called once when the view is first created. It configures the `PDFView` with default settings and
@@ -170,6 +202,12 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
         pdfView.displayMode = .singlePageContinuous
         pdfView.displayDirection = .horizontal
         pdfView.document = document
+        pdfView.delegate = context.coordinator
+        if let totalPages = pdfView.document?.pageCount {
+            DispatchQueue.main.async {
+                self.totalPages = totalPages
+            }
+        }
         return pdfView
     }
 
@@ -187,6 +225,12 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
         pdfView.displayDirection = displayDirection
         pdfView.document = document
     }
+    
+    
+    public func makeCoordinator() -> Coordinator {
+        return Coordinator(parent: self)
+    }
+    
     
     /// Sets whether the `PDFView` should automatically scale the document.
     ///
@@ -251,8 +295,39 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
         copy.displayDirection = direction
         return copy
     }
+    
+    func totalPage(_ totalPages: Binding<Int?>) -> Self {
+        var copy = self
+        copy._totalPages = totalPages
+        return copy
+    }
+
+    func currentPage(_ currentPage: Binding<Int?>) -> Self {
+        var copy = self
+        copy._currentPage = currentPage
+        return copy
+    }
+    
 }
 
 #endif
+
+
+public class Coordinator: NSObject, PDFViewDelegate {
+    var parent: PDFKitRepresentedView
+    
+    init(parent: PDFKitRepresentedView) {
+        self.parent = parent
+    }
+    
+    @MainActor func pdfViewPageChanged(_ sender: PDFView) {
+        guard let currentPage = sender.currentPage,
+              let pageIndex = sender.document?.index(for: currentPage) else { return }
+        
+        DispatchQueue.main.async {
+            self.parent.currentPage = pageIndex + 1
+        }
+    }
+}
 
 

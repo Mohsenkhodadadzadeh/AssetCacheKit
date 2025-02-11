@@ -84,7 +84,7 @@ public struct CachedPDFLoader: AssetLoader, Equatable {
             guard let pdfDocument = PDFDocument(data: pdfData) else {
                 throw LoaderError.invalidPDFData
             }
-            return PDFKitRepresentedView(document: pdfDocument)
+            return PDFKitRepresentedView(document: pdfDocument, currentPage: .constant(nil), totalPages: .constant(nil))
         }
     }
     
