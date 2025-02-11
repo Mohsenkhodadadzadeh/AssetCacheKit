@@ -144,13 +144,13 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
         return copy
     }
     
-    func totalPage(_ totalPages: Binding<Int?>) -> Self {
+    public func totalPage(_ totalPages: Binding<Int?>) -> Self {
         var copy = self
         copy._totalPages = totalPages
         return copy
     }
 
-    func currentPage(_ currentPage: Binding<Int?>) -> Self {
+    public func currentPage(_ currentPage: Binding<Int?>) -> Self {
         var copy = self
         copy._currentPage = currentPage
         return copy
@@ -296,13 +296,13 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
         return copy
     }
     
-    func totalPage(_ totalPages: Binding<Int?>) -> Self {
+    public func totalPage(_ totalPages: Binding<Int?>) -> Self {
         var copy = self
         copy._totalPages = totalPages
         return copy
     }
 
-    func currentPage(_ currentPage: Binding<Int?>) -> Self {
+    public func currentPage(_ currentPage: Binding<Int?>) -> Self {
         var copy = self
         copy._currentPage = currentPage
         return copy
