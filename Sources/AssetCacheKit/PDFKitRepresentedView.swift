@@ -77,7 +77,7 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
     }
     
     public func makeCoordinator() -> Coordinator {
-        return Coordinator(parent: self)
+        return Coordinator(currentPage: $currentPage)
     }
     
     /// Sets whether the `PDFView` should automatically scale the document.
@@ -228,7 +228,7 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
     
     
     public func makeCoordinator() -> Coordinator {
-        return Coordinator(parent: self)
+        return Coordinator(currentPage: $currentPage)
     }
     
     
@@ -314,19 +314,18 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
 
 
 public class Coordinator: NSObject, PDFViewDelegate {
-    var parent: PDFKitRepresentedView
-    
-    init(parent: PDFKitRepresentedView) {
-        self.parent = parent
+    @Binding var currentPage: Int?
+    init(currentPage: Binding<Int?>) {
+        self._currentPage = currentPage
     }
     
-    @MainActor func pdfViewPageChanged(_ sender: PDFView) {
+    @MainActor
+    func pdfViewPageChanged(_ sender: PDFView) {
         guard let currentPage = sender.currentPage,
               let pageIndex = sender.document?.index(for: currentPage) else { return }
         
-        DispatchQueue.main.async {
-            self.parent.currentPage = pageIndex + 1
-        }
+        self.currentPage = pageIndex + 1
+        print("Current page is added: \(pageIndex + 1)")
     }
 }
 
