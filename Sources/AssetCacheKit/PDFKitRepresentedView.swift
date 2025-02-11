@@ -52,6 +52,7 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
         pdfView.displayDirection = .horizontal
         pdfView.document = document
         pdfView.delegate = context.coordinator
+        context.coordinator.observePageChanges(for: pdfView)
         if let totalPages = pdfView.document?.pageCount {
             DispatchQueue.main.async {
                 self.totalPages = totalPages
@@ -203,6 +204,7 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
         pdfView.displayDirection = .horizontal
         pdfView.document = document
         pdfView.delegate = context.coordinator
+        context.coordinator.observePageChanges(for: pdfView)
         if let totalPages = pdfView.document?.pageCount {
             DispatchQueue.main.async {
                 self.totalPages = totalPages
@@ -319,13 +321,26 @@ public class Coordinator: NSObject, PDFViewDelegate {
         self._currentPage = currentPage
     }
     
-    @MainActor
-    func pdfViewPageChanged(_ sender: PDFView) {
-        guard let currentPage = sender.currentPage,
-              let pageIndex = sender.document?.index(for: currentPage) else { return }
-        
-        self.currentPage = pageIndex + 1
-        print("Current page is added: \(pageIndex + 1)")
+    func observePageChanges(for pdfView: PDFView) {
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name.PDFViewPageChanged,
+            object: pdfView,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self, let pdfView = notification.object as? PDFView else { return }
+            DispatchQueue.main.async {
+                guard let currentPage = pdfView.currentPage,
+                      let pageIndex = pdfView.document?.index(for: currentPage) else { return }
+                
+                self.currentPage = pageIndex + 1
+                print("📄 Current Page: \(pageIndex + 1)")
+            }
+            
+        }
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self, name: Notification.Name.PDFViewPageChanged, object: nil)
     }
 }
 
