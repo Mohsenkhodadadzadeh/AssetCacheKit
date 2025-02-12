@@ -34,6 +34,19 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
     /// - Default: `.horizontal`
     var displayDirection: PDFDisplayDirection = .horizontal
     
+    /// The current page number in the displayed PDF document.
+    ///
+    /// This is a `Binding` that a data binding variable which allows track the current page as the user
+    /// navigates through the PDF document.
+    @Binding var currentPage: Int?
+    
+    /// The total number of pages in the displayed PDF document.
+    ///
+    /// This is a `Binding` that a data binding variable which allows track the total number of pages in the PDF
+    /// document.
+    @Binding var totalPages: Int?
+    
+    
     /// Creates the `PDFView` instance.
     ///
     /// This method is called once when the view is first created. It configures the `PDFView` with default settings and
@@ -47,6 +60,14 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
         pdfView.displayMode = .singlePageContinuous
         pdfView.displayDirection = .horizontal
         pdfView.document = document
+        pdfView.delegate = context.coordinator
+        context.coordinator.observePageChanges(for: pdfView)
+        if let totalPages = pdfView.document?.pageCount {
+            DispatchQueue.main.async {
+                self.totalPages = totalPages
+            }
+        }
+       
         return pdfView
     }
 
@@ -63,6 +84,10 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
         pdfView.displayMode = displayMode
         pdfView.displayDirection = displayDirection
         pdfView.document = document
+    }
+    
+    public func makeCoordinator() -> Coordinator {
+        return Coordinator(currentPage: $currentPage)
     }
     
     /// Sets whether the `PDFView` should automatically scale the document.
@@ -126,6 +151,26 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
     public func displayDirection(_ direction: PDFDisplayDirection) -> Self {
         var copy = self
         copy.displayDirection = direction
+        return copy
+    }
+    
+    /// Updates the `totalPages` binding to track the total number of pages in the PDF document.
+    ///
+    /// - Parameter totalPages: A binding to an `Int?` that will be updated with the total number of pages.
+    /// - Returns: A modified `PDFKitRepresentedView` instance with the updated binding.
+    public func totalPage(_ totalPages: Binding<Int?>) -> Self {
+        var copy = self
+        copy._totalPages = totalPages
+        return copy
+    }
+
+    /// Updates the `currentPage` binding to track the current page number in the PDF document.
+    ///
+    /// - Parameter currentPage: A binding to an `Int?` that will be updated with the current page number.
+    /// - Returns: A modified `PDFKitRepresentedView` instance with the updated binding.
+    public func currentPage(_ currentPage: Binding<Int?>) -> Self {
+        var copy = self
+        copy._currentPage = currentPage
         return copy
     }
     
@@ -157,6 +202,20 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
     ///
     /// - Default: `.horizontal`
     var displayDirection: PDFDisplayDirection = .horizontal
+    
+    /// The current page number in the displayed PDF document.
+    ///
+    /// This is a `Binding` that a data binding variable which allows track the current page as the user
+    /// navigates through the PDF document.
+    @Binding var currentPage: Int?
+    
+    /// The total number of pages in the displayed PDF document.
+    ///
+    /// This is a `Binding` that a data binding variable which allows track the total number of pages in the PDF
+    /// document.
+    @Binding var totalPages: Int?
+    
+    
     /// Creates the `PDFView` instance.
     ///
     /// This method is called once when the view is first created. It configures the `PDFView` with default settings and
@@ -170,6 +229,13 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
         pdfView.displayMode = .singlePageContinuous
         pdfView.displayDirection = .horizontal
         pdfView.document = document
+        pdfView.delegate = context.coordinator
+        context.coordinator.observePageChanges(for: pdfView)
+        if let totalPages = pdfView.document?.pageCount {
+            DispatchQueue.main.async {
+                self.totalPages = totalPages
+            }
+        }
         return pdfView
     }
 
@@ -187,6 +253,12 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
         pdfView.displayDirection = displayDirection
         pdfView.document = document
     }
+    
+    
+    public func makeCoordinator() -> Coordinator {
+        return Coordinator(currentPage: $currentPage)
+    }
+    
     
     /// Sets whether the `PDFView` should automatically scale the document.
     ///
@@ -251,8 +323,73 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
         copy.displayDirection = direction
         return copy
     }
+    
+    /// Updates the `totalPages` binding to track the total number of pages in the PDF document.
+    ///
+    /// - Parameter totalPages: A binding to an `Int?` that will be updated with the total number of pages.
+    /// - Returns: A modified `PDFKitRepresentedView` instance with the updated binding.
+    public func totalPage(_ totalPages: Binding<Int?>) -> Self {
+        var copy = self
+        copy._totalPages = totalPages
+        return copy
+    }
+
+    /// Updates the `currentPage` binding to track the current page number in the PDF document.
+    ///
+    /// - Parameter currentPage: A binding to an `Int?` that will be updated with the current page number.
+    /// - Returns: A modified `PDFKitRepresentedView` instance with the updated binding.
+    public func currentPage(_ currentPage: Binding<Int?>) -> Self {
+        var copy = self
+        copy._currentPage = currentPage
+        return copy
+    }
+    
 }
 
 #endif
+
+/// A coordinator class responsible for observing page changes in a `PDFView` and updating the current page binding.
+///
+/// `Coordinator` listens for page change notifications and updates the `currentPage` binding accordingly.
+public class Coordinator: NSObject, PDFViewDelegate {
+    
+    /// A binding to the current page number in the PDF document.
+    ///
+    /// This binding is updated when the page changes in the associated `PDFView`.
+    @Binding var currentPage: Int?
+    
+    /// Initializes a new `Coordinator` instance.
+    ///
+    /// - Parameter currentPage: A binding to an `Int?` representing the current page number.
+    init(currentPage: Binding<Int?>) {
+        self._currentPage = currentPage
+    }
+    
+    /// Observes page change events in the specified `PDFView` and updates the `currentPage` binding.
+    ///
+    /// - Parameter pdfView: The `PDFView` to observe for page changes.
+    func observePageChanges(for pdfView: PDFView) {
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name.PDFViewPageChanged,
+            object: pdfView,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self, let pdfView = notification.object as? PDFView else { return }
+            DispatchQueue.main.async {
+                guard let currentPage = pdfView.currentPage,
+                      let pageIndex = pdfView.document?.index(for: currentPage) else { return }
+                
+                self.currentPage = pageIndex + 1
+                print("📄 Current Page: \(pageIndex + 1)")
+            }
+            
+        }
+    }
+    
+    /// Cleans up the notification observer when the `Coordinator` is deallocated.
+    deinit {
+        NotificationCenter.default.removeObserver(self, name: Notification.Name.PDFViewPageChanged, object: nil)
+    }
+}
 
 
