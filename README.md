@@ -63,6 +63,8 @@ import AssetCacheKit
 import SwiftUI
 
 struct ContentView: View {
+    @State private var totalPage: Int? = nil
+    @State private var currentPage: Int? = nil
     var body: some View {
     
         AssetCacheKit(loader: CachedPDFLoader(url: URL(string: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf")))
@@ -71,19 +73,27 @@ struct ContentView: View {
                 .autoScale(true)               // Automatically scales the PDF to fit the view
                 .displayMode(.twoUpContinuous) // Displays the PDF with two pages side by side and continuous scrolling
                 .displayDirection(.vertical)   // Makes the PDF scroll vertically
+                .totalPage($totalPage)         // Binds the total number of pages in the PDF to a state variable
+                .currentPage($currentPage)     // Binds the current page number to a state variable
         } placeholder: {
             Text("Loading...")
         } error: { err in
             Text("Error is: \(err)")
         }
+        if let totalPage, let currentPage {
+            Text("Page \(currentPage) from \(totalPage)")
+        }
     }
 }
+
 ```
 
 The CachedPDFLoader works similarly to the image loader but for PDF documents. It loads and caches the PDF file and displays it in a SwiftUI view. Here are some view modifiers you can apply:
- - **autoScale(true):** Automatically scales the PDF to fit the view’s dimensions.
+ - **autoScale(_):** Automatically scales the PDF to fit the view’s dimensions.
  - **displayMode(_:):** Sets how the PDF pages are displayed (e.g., `.singlePage`, `.twoUpContinuous`).
  - **displayDirection(_:):** Specifies the scroll direction of the PDF pages (e.g., `.horizontal`, `.vertical`).
+ - **totalPage(_:):** Binds to an `Int?` to provide the total number of pages in the PDF document. This binding is updated automatically when the PDF is fully loaded.
+ - **currentPage(_:):** Binds to an `Int?` to track the currently displayed page number. This binding is updated as the user navigates through the PDF pages.
  
 These modifiers allow for customization of how the PDF is presented and interacted with in your app.
 
