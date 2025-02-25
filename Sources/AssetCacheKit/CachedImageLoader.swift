@@ -55,9 +55,9 @@ public struct CachedImageLoader: AssetLoader, Equatable {
              throw LoaderError.invalidResponse
          }
 
-         if let cachedResponse = CachedURLResponse(response: httpResponse, data: data) as? CachedURLResponse {
-             urlCache.storeCachedResponse(cachedResponse, for: urlRequest)
-         }
+        let cachedResponse = CachedURLResponse(response: httpResponse, data: data)
+        urlCache.storeCachedResponse(cachedResponse, for: urlRequest)
+         
          return try image(from: data)
      }
 
