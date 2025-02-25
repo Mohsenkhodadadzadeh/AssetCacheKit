@@ -117,7 +117,7 @@ struct ContentView: View {
     }
 }
 ```
-CachedSVGLoader enables loading and caching of *SVG images* from remote URLs. It integrates seamlessly with *AssetCacheKit*, ensuring efficient retrieval and rendering of SVG assets while reducing redundant network requests.
+CachedSVGLoader enables loading and caching of **SVG images** from remote URLs. It integrates seamlessly with **AssetCacheKit**, ensuring efficient retrieval and rendering of SVG assets while reducing redundant network requests.
 
 
 
