@@ -98,6 +98,29 @@ The CachedPDFLoader works similarly to the image loader but for PDF documents. I
 These modifiers allow for customization of how the PDF is presented and interacted with in your app.
 
 
+**Loading SVGs with CachedSVGLoader**
+```Swift
+import AssetCacheKit
+import SwiftUI
+
+struct ContentView: View {
+    var body: some View {
+        AssetCacheKit(loader: CachedSVGLoader(url: URL(string: "https://example.com/example.svg"))) { image in
+                image
+                    .resizable()
+                    .frame(width: 350, height: 200)
+        } placeholder: {
+            ProgressView()
+        } error: { err in
+            Text(err.localizedDescription)
+        }
+    }
+}
+```
+CachedSVGLoader enables loading and caching of *SVG images* from remote URLs. It integrates seamlessly with *AssetCacheKit*, ensuring efficient retrieval and rendering of SVG assets while reducing redundant network requests.
+
+
+
 ## Custom Asset Loaders
 For assets beyond images, create a custom type conforming to the `AssetLoader` protocol. This type defines the specific logic for fetching your desired asset type.
 
