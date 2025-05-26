@@ -32,10 +32,11 @@ import SwiftUI
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
 public struct AssetCacheKit<Loader: AssetLoader, Content: View, Placeholder: View, ErrorContent: View>: View {
     /// The current phase of the asynchronous asset loading process.
-    @State internal var phase: AsyncPhase<Loader.Asset> = .empty
+    //@State internal var phase: AsyncPhase<Loader.Asset> = .empty
+    @StateObject private var viewModel:AssetCachKitViewModel<Loader>
     
     /// The asset loader responsible for fetching the asset.
-    let loader: Loader
+  //  let loader: Loader
     
     /// A closure that builds the content view from the loaded asset.
     let content: (Loader.Asset) -> Content
@@ -48,7 +49,8 @@ public struct AssetCacheKit<Loader: AssetLoader, Content: View, Placeholder: Vie
     
     /// Initializes a new `AssetCacheKit` instance.
     public init(loader: Loader, @ViewBuilder content: @escaping (Loader.Asset) -> Content, @ViewBuilder placeholder: @escaping () -> Placeholder, @ViewBuilder error: @escaping (Error) -> ErrorContent) {
-        self.loader = loader
+        self._viewModel = .init(wrappedValue: .init(loader: loader))
+      //  self.loader = loader
         self.content = content
         self.placeholder = placeholder
         self.errorView = error
@@ -56,7 +58,7 @@ public struct AssetCacheKit<Loader: AssetLoader, Content: View, Placeholder: Vie
     
     public var body: some View {
         Group {
-            switch phase {
+            switch viewModel.phase {
             case .empty:
                 placeholder()
             case .success(let asset):
@@ -65,24 +67,35 @@ public struct AssetCacheKit<Loader: AssetLoader, Content: View, Placeholder: Vie
                 errorView(error)
             }
         }
-        .task(id: loader, priority: .userInitiated) {
-            phase = .empty
-            await loadAsset()
+        .task(id: viewModel.loader.url, priority: .userInitiated) {
+            viewModel.phase = .empty
+            await viewModel.loadAsset()
         }
     }
     
     /// Loads the asset asynchronously.
-    private func loadAsset() async {
-        do {
-            let asset = try await loader.loadAsset()
-            await MainActor.run {
-                phase = .success(asset)
-            }
-        } catch {
-            await MainActor.run {
-                phase = .failure(error)
-            }
-        }
+
+    
+}
+
+
+@MainActor
+class AssetCachKitViewModel<Loader: AssetLoader>: ObservableObject {
+    @Published var phase: AsyncPhase<Loader.Asset> = .empty
+    let loader: Loader
+    
+    init(loader: Loader) {
+        self.loader = loader
     }
     
+    func loadAsset() async {
+        do {
+            let asset = try await loader.loadAsset()
+            phase = .success(asset)
+            print("ViewModel set phase to success: \(asset)")
+        } catch {
+            phase = .failure(error)
+            print("ViewModel set phase to error: \(error)")
+        }
+    }
 }
