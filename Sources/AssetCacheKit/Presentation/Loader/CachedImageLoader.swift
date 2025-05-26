@@ -23,8 +23,8 @@ import SwiftUI
 /// - `SwiftUI`: For image display.
 /// - `Foundation`: For networking (`URLSession`, `URLCache`) and data handling.
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
-@MainActor
-public struct CachedImageLoader: AssetLoader {
+
+public struct CachedImageLoader: AssetLoader, Equatable {
     
     /// The URL of the image to be loaded.
     public var url: URL?
@@ -73,4 +73,8 @@ public struct CachedImageLoader: AssetLoader {
      }
     
 
+    nonisolated public static func == (lhs: CachedImageLoader, rhs: CachedImageLoader) -> Bool {
+          return lhs.url == rhs.url && lhs.scale == rhs.scale
+      }
+    
 }

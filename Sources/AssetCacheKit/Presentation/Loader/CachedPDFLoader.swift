@@ -45,7 +45,7 @@ import SwiftUI
 ///
 /// ## API
 @available(iOS 15.0, macOS 12.0, *)
-public struct CachedPDFLoader: AssetLoader {
+public struct CachedPDFLoader: AssetLoader, Equatable {
     
     /// The URL of the PDF document to load.
     ///
@@ -96,5 +96,15 @@ public struct CachedPDFLoader: AssetLoader {
             }
             return PDFKitRepresentedView(document: pdfDocument, currentPage: .constant(nil), totalPages: .constant(nil))
         }
+    }
+    
+    /// Conformance to `Equatable` to compare two instances of `CachedPDFLoader`.
+    ///
+    /// - Parameters:
+    ///   - lhs: The first `CachedPDFLoader` instance.
+    ///   - rhs: The second `CachedPDFLoader` instance.
+    /// - Returns: A boolean value indicating whether the two instances are equal.
+    public static func == (lhs: CachedPDFLoader, rhs: CachedPDFLoader) -> Bool {
+        return lhs.url == rhs.url
     }
 }

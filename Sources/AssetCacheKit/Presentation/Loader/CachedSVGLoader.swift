@@ -12,7 +12,7 @@ import Foundation
 /// `CachedSVGLoader` fetches an SVG image from a URL and caches it for efficient reuse.
 /// It conforms to `AssetLoader` and supports async/await for network operations.
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
-public struct CachedSVGLoader: AssetLoader {
+public struct CachedSVGLoader: AssetLoader, Equatable {
     
     /// The URL of the SVG image to be loaded.
     public var url: URL?
@@ -57,5 +57,15 @@ public struct CachedSVGLoader: AssetLoader {
     private func dataTosvgImage(from data: Data) throws -> Image {
         guard let image = SVGKit(data)?.swiftUIImage() else { throw AppError.assetLoading(.invalidSVGData) }
         return image
+    }
+    
+    /// Compares two `CachedSVGLoader` instances.
+    ///
+    /// - Parameters:
+    ///   - lhs: The first instance.
+    ///   - rhs: The second instance.
+    /// - Returns: `true` if both instances have the same URL.
+    public static func == (lhs: CachedSVGLoader, rhs: CachedSVGLoader) -> Bool {
+        return lhs.url == rhs.url
     }
 }
