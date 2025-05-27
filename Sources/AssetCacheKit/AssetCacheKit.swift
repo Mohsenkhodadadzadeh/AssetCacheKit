@@ -33,6 +33,7 @@ import SwiftUI
 public struct AssetCacheKit<Loader: AssetLoader, Content: View, Placeholder: View, ErrorContent: View>: View {
     /// The current phase of the asynchronous asset loading process.
     @State internal var phase: AsyncPhase<Loader.Asset> = .empty
+   // @StateObject private var viewModel:AssetCachKitViewModel<Loader>
     
     /// The asset loader responsible for fetching the asset.
     let loader: Loader
@@ -48,6 +49,7 @@ public struct AssetCacheKit<Loader: AssetLoader, Content: View, Placeholder: Vie
     
     /// Initializes a new `AssetCacheKit` instance.
     public init(loader: Loader, @ViewBuilder content: @escaping (Loader.Asset) -> Content, @ViewBuilder placeholder: @escaping () -> Placeholder, @ViewBuilder error: @escaping (Error) -> ErrorContent) {
+       // self._viewModel = .init(wrappedValue: .init(loader: loader))
         self.loader = loader
         self.content = content
         self.placeholder = placeholder
@@ -84,5 +86,4 @@ public struct AssetCacheKit<Loader: AssetLoader, Content: View, Placeholder: Vie
             }
         }
     }
-    
 }

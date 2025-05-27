@@ -50,72 +50,11 @@ public struct CachedPDFLoader: AssetLoader, Equatable {
     /// The URL of the PDF document to load.
     ///
     /// This property holds the URL to the PDF file that will be fetched, cached, and displayed. It must not be `nil`.
-    public let url: URL?
+    public var url: URL?
+    private let loadAssetUseCase: LoadAssetUseCase
+   
     
-    private var urlRequest: URLRequest? {
-        if let url {
-            return URLRequest(url: url)
-        }
-        return nil
-    }
     
-    private let urlSession: URLSession
-    private let urlCache: URLCache
-
-    /// Loads the PDF document asynchronously and returns a SwiftUI `View`.
-    ///
-    /// This method fetches the PDF document, either from the cache or the network, and returns a `PDFKitRepresentedView`
-    /// that can be used in a SwiftUI view hierarchy to display the PDF content.
-    ///
-    /// - Returns: A SwiftUI `View` displaying the PDF content.
-    /// - Throws: `LoaderError.invalidURL`, `LoaderError.invalidResponse`, or `LoaderError.invalidPDFData` if any issues occur.
-    public func loadAsset() async throws -> PDFKitRepresentedView  {
-        guard let urlRequest = urlRequest else {
-            throw LoaderError.invalidURL
-        }
-
-       
-        // Fetch PDF data asynchronously
-        let pdfData = try await fetchPDFData(from: urlRequest)
-    
-        
-        // Create a PDF view on the main thread
-        return try await MainActor.run {
-            guard let pdfDocument = PDFDocument(data: pdfData) else {
-                throw LoaderError.invalidPDFData
-            }
-            return PDFKitRepresentedView(document: pdfDocument, currentPage: .constant(nil), totalPages: .constant(nil))
-        }
-    }
-    
-    /// Fetches the PDF data, either from cache or from the network.
-    ///
-    /// - Parameter url: The URL request for the PDF document.
-    /// - Returns: The PDF data.
-    /// - Throws: `LoaderError.invalidResponse` if the response is invalid or cannot be fetched.
-    private func fetchPDFData(from url: URLRequest) async throws -> Data {
-        
-        // Check if the PDF is already cached
-        if let cachedData = cachedPDFData(from: url, cache: urlCache) {
-            return cachedData
-        }
-
-        // Fetch from the network if not cached
-        let (data, response) = try await urlSession.data(for: url)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw LoaderError.invalidResponse
-        }
-
-        // Cache the response
-        let cachedResponse = CachedURLResponse(response: httpResponse, data: data)
-        urlCache.storeCachedResponse(cachedResponse, for: url)
-        return data
-
-        
-    }
-
     /// Initializes a new `CachedPDFLoader` instance.
     ///
     /// - Parameters:
@@ -125,26 +64,38 @@ public struct CachedPDFLoader: AssetLoader, Equatable {
         self.url = url
         let configuration = URLSessionConfiguration.default
         configuration.urlCache = urlCache
-        self.urlSession = URLSession(configuration: configuration)
-        self.urlCache = urlCache
+        let urlSession = URLSession(configuration: configuration)
+        let defaultAssetRepository = DefaultAssetRepository(urlSession: urlSession, urlCache: urlCache)
+        self.loadAssetUseCase = DefaultLoadAssetUseCase(repository: defaultAssetRepository)
+        
     }
-
-    /// Attempts to retrieve cached PDF data from the cache.
+    
+    internal init(url: URL?, loadAssetUseCase: LoadAssetUseCase) {
+        self.url = url
+        self.loadAssetUseCase = loadAssetUseCase
+    }
+    
+    /// Loads the PDF document asynchronously and returns a SwiftUI `View`.
     ///
-    /// - Parameters:
-    ///   - request: The `URLRequest` associated with the PDF document.
-    ///   - cache: The `URLCache` to search for the cached response.
-    /// - Returns: The cached PDF data if it exists in the cache, otherwise `nil`.
-    private func cachedPDFData(from request: URLRequest, cache: URLCache) -> Data? {
-        guard let cachedResponse = cache.cachedResponse(for: request) else { return nil }
-        return cachedResponse.data
-    }
-
-    /// Defines errors that can be thrown by `CachedPDFLoader`.
-    public enum LoaderError: Error {
-        case invalidURL
-        case invalidResponse
-        case invalidPDFData
+    /// This method fetches the PDF document, either from the cache or the network, and returns a `PDFKitRepresentedView`
+    /// that can be used in a SwiftUI view hierarchy to display the PDF content.
+    ///
+    /// - Returns: A SwiftUI `View` displaying the PDF content.
+    /// - Throws: `LoaderError.invalidURL`, `LoaderError.invalidResponse`, or `LoaderError.invalidPDFData` if any issues occur.
+    public func loadAsset() async throws -> PDFKitRepresentedView  {
+        
+       
+        // Fetch PDF data asynchronously
+        let pdfData = try await loadAssetUseCase.execute(url: url)
+    
+        
+        // Create a PDF view on the main thread
+        return try await MainActor.run {
+            guard let pdfDocument = PDFDocument(data: pdfData) else {
+                throw AppError.assetLoading(.invalidPDFData)
+            }
+            return PDFKitRepresentedView(document: pdfDocument, currentPage: .constant(nil), totalPages: .constant(nil))
+        }
     }
     
     /// Conformance to `Equatable` to compare two instances of `CachedPDFLoader`.
