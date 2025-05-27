@@ -14,9 +14,12 @@ public protocol AssetLoader: Sendable, Equatable {
     /// The type of the asset being loaded.
     associatedtype Asset: Sendable
     
+    var url: URL? { get set}
     /// Asynchronously loads the asset.
     ///
     /// - Returns: The loaded asset.
     /// - Throws: An error if the asset could not be loaded.
     func loadAsset() async throws -> Asset
+    
+    
 }
