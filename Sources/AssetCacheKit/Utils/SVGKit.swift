@@ -7,13 +7,24 @@
 
 import Darwin
 import Foundation
+#if os(macOS)
+import AppKit
+#else
 import UIKit
+#endif
+
 import Combine
 import SwiftUI
 
 /// Represents an SVG document that can be rendered and manipulated.
 @objc
 public class CGSVGDocument: NSObject { }
+
+#if os(iOS)
+typealias PlatformImage = UIImage
+#elseif os(macOS)
+typealias PlatformImage = NSImage
+#endif
 
 /// Releases the allocated CGSVGDocument instance.
 public let CGSVGDocumentRelease: (@convention(c) (CGSVGDocument?) -> Void) = load("CGSVGDocumentRelease")
@@ -28,7 +39,7 @@ public let CGContextDrawSVGDocument: (@convention(c) (CGContext?, CGSVGDocument?
 public let CGSVGDocumentGetCanvasSize: (@convention(c) (CGSVGDocument?) -> CGSize) = load("CGSVGDocumentGetCanvasSize")
 
 /// Type alias for rendering an image from an SVG document.
-typealias ImageWithCGSVGDocument = @convention(c) (AnyObject, Selector, CGSVGDocument) -> UIImage
+typealias ImageWithCGSVGDocument = @convention(c) (AnyObject, Selector, CGSVGDocument) -> PlatformImage
 
 /// Selector for generating a UIImage from an SVG document.
 public let ImageWithCGSVGDocumentSEL: Selector = NSSelectorFromString("_imageWithCGSVGDocument:")
@@ -75,20 +86,38 @@ public class SVGKit {
     /// Converts the SVG document into a SwiftUI Image.
     /// - Returns: A SwiftUI `Image` representation of the SVG.
     public func swiftUIImage() -> Image? {
-        guard let uiImage = renderUIImage() else { return nil }
-        return Image(uiImage: uiImage)
+        guard let platformImage = renderPlatformImage() else { return nil }
+#if os(iOS)
+        return Image(uiImage: platformImage)
             .resizable()
+#elseif os(macOS)
+        return Image(nsImage: platformImage)
+            .resizable()
+#endif
+        
     }
 
-    /// Renders the SVG document as a `UIImage`.
-    /// - Returns: A `UIImage` representing the SVG.
-    private func renderUIImage() -> UIImage? {
+    /// Renders the SVG document as a PlatformImage.
+    /// - Returns: A `PlatformImage` representing the SVG.
+    private func renderPlatformImage() -> PlatformImage? {
         guard let document else { return nil }
         
-        let render = UIGraphicsImageRenderer(size: size)
-        return render.image { context in
+        #if os(iOS)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { context in
             CGContextDrawSVGDocument(context.cgContext, document)
         }
+        #elseif os(macOS)
+        let image = NSImage(size: size)
+        image.lockFocusFlipped(true)
+        if let context = NSGraphicsContext.current?.cgContext {
+            CGContextDrawSVGDocument(context, document)
+            image.unlockFocus()
+            return image
+        }
+        image.unlockFocus()
+        return nil
+        #endif
     }
    
     /// Draws the SVG document into a given graphics context.

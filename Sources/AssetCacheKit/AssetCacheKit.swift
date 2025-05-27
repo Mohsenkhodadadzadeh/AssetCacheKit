@@ -87,25 +87,3 @@ public struct AssetCacheKit<Loader: AssetLoader, Content: View, Placeholder: Vie
         }
     }
 }
-
-
-//@MainActor
-//class AssetCachKitViewModel<Loader: AssetLoader>: ObservableObject {
-//    @Published var phase: AsyncPhase<Loader.Asset> = .empty
-//    let loader: Loader
-//    
-//    init(loader: Loader) {
-//        self.loader = loader
-//    }
-//    
-//    func loadAsset() async {
-//        do {
-//            let asset = try await loader.loadAsset()
-//            phase = .success(asset)
-//            print("ViewModel set phase to success: \(asset)")
-//        } catch {
-//            phase = .failure(error)
-//            print("ViewModel set phase to error: \(error)")
-//        }
-//    }
-//}

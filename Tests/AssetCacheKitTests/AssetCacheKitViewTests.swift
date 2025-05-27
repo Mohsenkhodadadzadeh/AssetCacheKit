@@ -1,6 +1,11 @@
 import XCTest
 import SwiftUI
 import Combine
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 @testable import AssetCacheKit
 
@@ -38,19 +43,42 @@ final class AssetCacheKitViewTests: XCTestCase {
             error: { _ in Text("Error") }
         )
         
+        
         // Render the view
+#if os(iOS)
         let hostingController = UIHostingController(rootView: sut)
         let window = UIWindow(frame: UIScreen.main.bounds)
         window.rootViewController = hostingController
         window.makeKeyAndVisible()
-        
+#elseif os(macOS)
+        let hostingController = NSHostingController(rootView: sut)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentViewController = hostingController
+        window.makeKeyAndOrderFront(nil)
+#endif
+//        // Render the view
+//        let hostingController = UIHostingController(rootView: sut)
+//        let window = UIWindow(frame: UIScreen.main.bounds)
+//        window.rootViewController = hostingController
+//        window.makeKeyAndVisible()
+//        
         // Then
         
         await fulfillment(of: [expectation], timeout: 2.0)
         
         // Clean up
+        #if os(iOS)
         window.isHidden = true
         window.rootViewController = nil
+        #elseif os(macOS)
+        window.orderOut(nil)
+        window.contentViewController = nil
+        #endif
     }
     
     @MainActor
@@ -70,18 +98,40 @@ final class AssetCacheKitViewTests: XCTestCase {
         )
         
         // Render the view
+#if os(iOS)
         let hostingController = UIHostingController(rootView: sut)
         let window = UIWindow(frame: UIScreen.main.bounds)
         window.rootViewController = hostingController
         window.makeKeyAndVisible()
+#elseif os(macOS)
+        let hostingController = NSHostingController(rootView: sut)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentViewController = hostingController
+        window.makeKeyAndOrderFront(nil)
+#endif
+        
+//        let hostingController = UIHostingController(rootView: sut)
+//        let window = UIWindow(frame: UIScreen.main.bounds)
+//        window.rootViewController = hostingController
+//        window.makeKeyAndVisible()
         
         // Then
         
         await fulfillment(of: [expectation], timeout: 2.0)
         
         // Clean up
+#if os(iOS)
         window.isHidden = true
         window.rootViewController = nil
+#elseif os(macOS)
+        window.orderOut(nil)
+        window.contentViewController = nil
+#endif
     }
     
     @MainActor
@@ -102,18 +152,40 @@ final class AssetCacheKitViewTests: XCTestCase {
         )
         
         // Render the view
+#if os(iOS)
         let hostingController = UIHostingController(rootView: sut)
         let window = UIWindow(frame: UIScreen.main.bounds)
         window.rootViewController = hostingController
         window.makeKeyAndVisible()
+#elseif os(macOS)
+        let hostingController = NSHostingController(rootView: sut)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentViewController = hostingController
+        window.makeKeyAndOrderFront(nil)
+#endif
+        
+//        let hostingController = UIHostingController(rootView: sut)
+//        let window = UIWindow(frame: UIScreen.main.bounds)
+//        window.rootViewController = hostingController
+//        window.makeKeyAndVisible()
         
         // Then
         
         await fulfillment(of: [expectation], timeout: 2.0)
         
         // Clean up
+#if os(iOS)
         window.isHidden = true
         window.rootViewController = nil
+#elseif os(macOS)
+        window.orderOut(nil)
+        window.contentViewController = nil
+#endif
     }
     
     // MARK: - Helper Methods

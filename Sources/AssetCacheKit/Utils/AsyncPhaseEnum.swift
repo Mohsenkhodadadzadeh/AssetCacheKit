@@ -23,7 +23,7 @@ public enum AsyncPhase<Content>: Equatable {
         switch (lhs, rhs) {
         case (.empty, .empty):
             return true
-        case (.success(let leftValue), .success(let rightValue)):
+        case (.success( _), .success( _)):
             return true
         case (.failure(let leftError), .failure(let rightError)):
             // Compare errors by their localized description or type
