@@ -110,7 +110,7 @@ internal final class DefaultAssetRepository: AssetRepository {
     
     /// Removes a specific asset from the cache.
     /// - Parameter urlRequest: The URLRequest whose cached response should be removed
-    func clearCache(for urlRequset: URLRequest) {
-        urlCache.removeCachedResponse(for: urlRequset)
+    func clearCache(for urlRequest: URLRequest) {
+        urlCache.removeCachedResponse(for: urlRequest)
     }
 }
