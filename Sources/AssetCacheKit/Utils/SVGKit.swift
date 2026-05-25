@@ -20,12 +20,6 @@ import SwiftUI
 @objc
 public class CGSVGDocument: NSObject { }
 
-#if os(iOS)
-typealias PlatformImage = UIImage
-#elseif os(macOS)
-typealias PlatformImage = NSImage
-#endif
-
 /// Releases the allocated CGSVGDocument instance.
 public let CGSVGDocumentRelease: (@convention(c) (CGSVGDocument?) -> Void) = load("CGSVGDocumentRelease")
 

@@ -7,41 +7,52 @@
 
 import Foundation
 
-/// A protocol that defines the contract for managing asset data storage and retrieval.
-/// This repository handles both network loading and caching of assets such as images, PDFs, and SVGs.
+/// Defines the contract for loading raw asset data from any source.
 ///
-/// The repository provides methods to:
-/// - Load assets from network or cache
-/// - Fetch cached assets
-/// - Cache new assets
-/// - Clear cached assets
+/// Conforming types are responsible for returning the raw bytes of an asset
+/// located at a given URL.  The caching strategy, eviction policy, and network
+/// behaviour are implementation details left to each conforming type.
 ///
-/// Example usage:
+/// The framework ships with ``DefaultAssetRepository``, which delegates to the
+/// shared ``AssetCache`` to provide memory caching, disk persistence, request
+/// deduplication, LRU eviction, and configurable retry out of the box.
+///
+/// ## Implementing a custom repository
+///
+/// Provide a custom conformance when you need to load assets from a non-standard
+/// source — for example, a local bundle, an encrypted store, or a mock for testing.
+///
 /// ```swift
-/// let repository: AssetRepository = DefaultAssetRepository()
-/// let data = try await repository.loadAsset(with: imageURL)
+/// struct BundleAssetRepository: AssetRepository {
+///     func loadAsset(with url: URL?) async throws -> Data {
+///         guard let url,
+///               let name = url.pathComponents.last,
+///               let fileURL = Bundle.main.url(forResource: name, withExtension: nil)
+///         else { throw AppError.assetLoading(.invalidURL) }
+///         return try Data(contentsOf: fileURL)
+///     }
+/// }
+/// ```
+///
+/// Inject your implementation through the loader's `internal` initialiser in tests:
+///
+/// ```swift
+/// let loader = CachedPDFLoader(
+///     url: url,
+///     loadAssetUseCase: DefaultLoadAssetUseCase(repository: BundleAssetRepository())
+/// )
 /// ```
 internal protocol AssetRepository: Sendable {
-    
-    /// Loads an asset from either the cache or network.
-    /// - Parameter url: The URL of the asset to load. Can be nil, in which case an error will be thrown.
-    /// - Returns: The loaded asset data
-    /// - Throws: An `AppError` if the loading fails due to network issues, invalid URL, or server errors.
+
+    /// Loads raw asset data for the given URL.
+    ///
+    /// Implementations should check local caches before making a network
+    /// request, and persist the result for future calls where applicable.
+    ///
+    /// - Parameter url: The remote location of the asset.  May be `nil` if the
+    ///   caller has not yet set a URL; implementations should throw
+    ///   ``AppError/assetLoading(_:)`` with `.invalidURL` in that case.
+    /// - Returns: The raw (compressed) asset bytes.
+    /// - Throws: An ``AppError`` describing the failure.
     func loadAsset(with url: URL?) async throws -> Data
-    
-    /// Retrieves a cached asset from storage if available.
-    /// - Parameter urlRequest: The URLRequest associated with the asset
-    /// - Returns: The cached data if available, nil otherwise
-    func fetchCachedAsset(for urlRequest: URLRequest) -> Data?
-    
-    /// Stores an asset in the cache for future retrieval.
-    /// - Parameters:
-    ///   - response: The HTTP response containing metadata about the asset
-    ///   - data: The asset data to be cached
-    ///   - urlRequest: The URLRequest associated with the asset
-    func cacheAsset(response: HTTPURLResponse, data: Data, for urlRequest: URLRequest)
-    
-    /// Removes a specific asset from the cache.
-    /// - Parameter urlRequest: The URLRequest associated with the asset to be removed
-    func clearCache(for urlRequest: URLRequest)
 }

@@ -5,67 +5,100 @@
 //  Created by mohsen on 2/25/25.
 //
 import SwiftUI
-import Foundation
 
-/// A structure that loads and caches SVG images asynchronously.
+/// An ``AssetLoader`` that loads and caches remote SVG images.
 ///
-/// `CachedSVGLoader` fetches an SVG image from a URL and caches it for efficient reuse.
-/// It conforms to `AssetLoader` and supports async/await for network operations.
+/// `CachedSVGLoader` fetches raw SVG bytes through the shared ``AssetCache``,
+/// which provides memory caching, disk persistence, request deduplication, LRU
+/// eviction, and configurable retry automatically.  The raw bytes are converted
+/// to a SwiftUI `Image` by the internal ``SVGKit`` renderer.
+///
+/// ## Usage
+///
+/// ```swift
+/// AssetCacheKit(
+///     loader: CachedSVGLoader(url: url),
+///     content: { image in image.resizable().scaledToFit() },
+///     placeholder: { ProgressView() },
+///     error: { error in Text(error.localizedDescription) }
+/// )
+/// ```
+///
+/// ## Testing
+///
+/// Inject a mock ``LoadAssetUseCase`` through the `internal` initialiser to
+/// test loader behaviour without network access:
+///
+/// ```swift
+/// let loader = CachedSVGLoader(
+///     url: url,
+///     loadAssetUseCase: MockLoadAssetUseCase(data: svgData)
+/// )
+/// ```
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
 public struct CachedSVGLoader: AssetLoader, Equatable {
-    
-    /// The URL of the SVG image to be loaded.
+
+    // MARK: - Public Properties
+
     public var url: URL?
-    
+
+    // MARK: - Private State
+
     private let loadAssetUseCase: LoadAssetUseCase
 
-    /// Initializes the `CachedSVGLoader` with a URL and a URL cache.
+    // MARK: - Init
+
+    /// Creates an SVG loader backed by the shared ``AssetCache``.
+    ///
+    /// - Parameter url: The remote location of the SVG file.
+    public init(url: URL?) {
+        self.url              = url
+        self.loadAssetUseCase = DefaultLoadAssetUseCase(
+            repository: DefaultAssetRepository()
+        )
+    }
+
+    /// Creates an SVG loader with an injected use case.
+    ///
+    /// Use this initialiser in unit tests to provide a mock ``LoadAssetUseCase``
+    /// that returns fixture data without making network requests.
     ///
     /// - Parameters:
-    ///   - url: The URL of the SVG image.
-    ///   - urlCache: The cache used for storing the downloaded image. Defaults to `.shared`.
-    public init(url: URL?, urlCache: URLCache = .shared) {
-        self.url = url
-        let configuration = URLSessionConfiguration.default
-        configuration.urlCache = urlCache
-        let urlSession = URLSession(configuration: configuration)
-        let defaultAssetRepository = DefaultAssetRepository(urlSession: urlSession, urlCache: urlCache)
-        self.loadAssetUseCase = DefaultLoadAssetUseCase(repository: defaultAssetRepository)
-    }
-    
+    ///   - url: The remote location of the SVG file.
+    ///   - loadAssetUseCase: The use case responsible for fetching raw bytes.
     internal init(url: URL?, loadAssetUseCase: LoadAssetUseCase) {
-        self.url = url
+        self.url              = url
         self.loadAssetUseCase = loadAssetUseCase
     }
-    
-    /// Loads the SVG asset asynchronously.
+
+    // MARK: - AssetLoader
+
+    /// Loads the remote SVG and returns a SwiftUI `Image`.
     ///
-    /// - Returns: An `Image` representation of the loaded SVG.
-    /// - Throws: `LoaderError.invalidURL` if the URL is invalid,
-    ///           `LoaderError.invalidResponse` if the network request fails,
-    ///           `LoaderError.invalidSVGData` if the image cannot be processed.
+    /// Raw bytes are fetched via the injected use case (backed by ``AssetCache``
+    /// by default) and converted to an `Image` by ``SVGKit``.
+    ///
+    /// - Returns: A SwiftUI `Image` rendered from the SVG source.
+    /// - Throws: ``AppError/assetLoading(.invalidURL)`` when ``url`` is `nil`,
+    ///   ``AppError/assetLoading(.invalidSVGData)`` if the bytes cannot be parsed
+    ///   as SVG, or ``AppError/network(_:)`` on a network failure.
     public func loadAsset() async throws -> Image {
-       let svgData = try await loadAssetUseCase.execute(url: url)
-        return try dataTosvgImage(from: svgData)
+        let data = try await loadAssetUseCase.execute(url: url)
+        return try svgImage(from: data)
     }
-    
-    /// Converts raw SVG data into a SwiftUI `Image`.
-    ///
-    /// - Parameter data: The raw data of the SVG file.
-    /// - Returns: A SwiftUI `Image` representation of the SVG.
-    /// - Throws: `LoaderError.invalidSVGData` if the conversion fails.
-    private func dataTosvgImage(from data: Data) throws -> Image {
-        guard let image = SVGKit(data)?.swiftUIImage() else { throw AppError.assetLoading(.invalidSVGData) }
-        return image
-    }
-    
-    /// Compares two `CachedSVGLoader` instances.
-    ///
-    /// - Parameters:
-    ///   - lhs: The first instance.
-    ///   - rhs: The second instance.
-    /// - Returns: `true` if both instances have the same URL.
+
+    // MARK: - Equatable
+
     public static func == (lhs: CachedSVGLoader, rhs: CachedSVGLoader) -> Bool {
-        return lhs.url == rhs.url
+        lhs.url == rhs.url
+    }
+
+    // MARK: - Private
+
+    private func svgImage(from data: Data) throws -> Image {
+        guard let image = SVGKit(data)?.swiftUIImage() else {
+            throw AppError.assetLoading(.invalidSVGData)
+        }
+        return image
     }
 }

@@ -2,78 +2,73 @@ import XCTest
 @testable import AssetCacheKit
 
 final class DefaultAssetRepositoryTests: XCTestCase {
+    private var cache: AssetCache!
     private var sut: DefaultAssetRepository!
-    private var urlSession: URLSession!
-    private var urlCache: URLCache!
-    
-    override func setUp() {
-        super.setUp()
-        urlCache = URLCache(memoryCapacity: 1024 * 1024, diskCapacity: 1024 * 1024, diskPath: nil)
-        urlSession = URLSession(configuration: .ephemeral)
-        sut = DefaultAssetRepository(urlSession: urlSession, urlCache: urlCache)
+
+    override func setUp() async throws {
+        try await super.setUp()
+        URLProtocolStub.startIntercepting()
+        cache = AssetCache(configuration: AssetCacheConfiguration(
+            rawDataMemoryByteLimit: 1_024 * 1_024,
+            diskByteLimit: 1_024 * 1_024,
+            defaultExpiration: 60,
+            retryPolicy: .none
+        ))
+        sut = DefaultAssetRepository(cache: cache)
+        await cache.clearAll()
     }
-    
-    override func tearDown() {
-        urlCache.removeAllCachedResponses()
+
+    override func tearDown() async throws {
+        await cache.clearAll()
+        cache = nil
         sut = nil
-        urlSession = nil
-        urlCache = nil
-        super.tearDown()
+        URLProtocolStub.stopIntercepting()
+        try await super.tearDown()
     }
-    
-    // MARK: - Load Asset Tests
-    
+
     func testLoadAsset_WithNilURL_ThrowsInvalidURL() async {
         do {
             _ = try await sut.loadAsset(with: nil)
-            XCTFail("Expected error to be thrown")
+            XCTFail("Expected invalid URL error")
         } catch let error as AppError {
-            XCTAssertEqual(error, AppError.assetLoading(.invalidURL))
+            XCTAssertEqual(error, .assetLoading(.invalidURL))
         } catch {
             XCTFail("Unexpected error type: \(error)")
         }
     }
-    
-    func testLoadAsset_WithCachedData_ReturnsCachedData() async throws {
-        // Given
-        let request = TestData.mockURLRequest(url: TestData.validURL)
-        let response = TestData.mockHTTPResponse(url: TestData.validURL, statusCode: 200)
-        let cachedResponse = CachedURLResponse(response: response, data: TestData.validImageData)
-        urlCache.storeCachedResponse(cachedResponse, for: request)
-        
-        // When
+
+    func testLoadAsset_ReturnsDataFromAssetCache() async throws {
+        let expected = "repository payload".data(using: .utf8)!
+        URLProtocolStub.requestHandler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, expected)
+        }
+
         let result = try await sut.loadAsset(with: TestData.validURL)
-        
-        // Then
-        XCTAssertEqual(result, TestData.validImageData)
+
+        XCTAssertEqual(result, expected)
+        XCTAssertEqual(URLProtocolStub.requestCount, 1)
     }
-    
-    // MARK: - Cache Tests
-    
-    func testCacheAsset_StoresDataInCache() {
-        // Given
-        let request = TestData.mockURLRequest(url: TestData.validURL)
-        let response = TestData.mockHTTPResponse(url: TestData.validURL, statusCode: 200)
-        
-        // When
-        sut.cacheAsset(response: response, data: TestData.validImageData, for: request)
-        
-        // Then
-        let cachedData = sut.fetchCachedAsset(for: request)
-        XCTAssertEqual(cachedData, TestData.validImageData)
+
+    func testLoadAsset_PropagatesNetworkError() async {
+        URLProtocolStub.requestHandler = { _ in
+            throw URLError(.notConnectedToInternet)
+        }
+
+        do {
+            _ = try await sut.loadAsset(with: TestData.validURL)
+            XCTFail("Expected network error")
+        } catch let error as AppError {
+            XCTAssertEqual(error, .network(.noConnection))
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+
+        XCTAssertEqual(URLProtocolStub.requestCount, 1)
     }
-    
-    func testClearCache_RemovesDataFromCache() {
-        // Given
-        let request = TestData.mockURLRequest(url: TestData.validURL)
-        let response = TestData.mockHTTPResponse(url: TestData.validURL, statusCode: 200)
-        sut.cacheAsset(response: response, data: TestData.validImageData, for: request)
-        
-        // When
-        sut.clearCache(for: request)
-        
-        // Then
-        let cachedData = sut.fetchCachedAsset(for: request)
-        XCTAssertNil(cachedData)
-    }
-} 
+}

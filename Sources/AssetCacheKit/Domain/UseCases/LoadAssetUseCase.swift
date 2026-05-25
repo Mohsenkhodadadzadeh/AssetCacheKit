@@ -7,47 +7,76 @@
 
 import Foundation
 
-/// A protocol that defines the contract for loading assets from a data source.
-/// This use case encapsulates the business logic for retrieving assets, abstracting away
-/// the underlying data source implementation details.
+// MARK: - Protocol
+
+/// Encapsulates the business logic for loading a single asset.
 ///
-/// Example usage:
+/// The use-case layer sits between the presentation layer (`AssetLoader` conformances)
+/// and the data layer (`AssetRepository` conformances), keeping each layer
+/// independently testable and open for extension.
+///
+/// The framework ships with ``DefaultLoadAssetUseCase``, which delegates directly
+/// to an ``AssetRepository``.  You can provide a custom implementation to add
+/// cross-cutting concerns such as logging, analytics, or data transformation
+/// without modifying either the loaders or the repositories.
+///
+/// ## Injecting a custom use case in tests
+///
 /// ```swift
-/// let useCase: LoadAssetUseCase = DefaultLoadAssetUseCase(repository: repository)
-/// let imageData = try await useCase.execute(url: imageURL)
+/// struct LoggingLoadAssetUseCase: LoadAssetUseCase {
+///     private let inner: LoadAssetUseCase
+///
+///     func execute(url: URL?) async throws -> Data {
+///         print("Loading asset:", url?.absoluteString ?? "nil")
+///         let data = try await inner.execute(url: url)
+///         print("Loaded \(data.count) bytes")
+///         return data
+///     }
+/// }
+///
+/// let loader = CachedPDFLoader(
+///     url: url,
+///     loadAssetUseCase: LoggingLoadAssetUseCase(inner: DefaultLoadAssetUseCase(
+///         repository: DefaultAssetRepository()
+///     ))
+/// )
 /// ```
 internal protocol LoadAssetUseCase: Sendable {
-    
-    /// Executes the asset loading operation.
-    /// - Parameter url: The URL of the asset to load. Can be nil, in which case an error will be thrown.
-    /// - Returns: The loaded asset data
-    /// - Throws: An error if the asset loading fails
+
+    /// Executes the asset-loading operation for the given URL.
+    ///
+    /// - Parameter url: The remote location of the asset.
+    /// - Returns: The raw asset bytes.
+    /// - Throws: An ``AppError`` describing the failure.
     func execute(url: URL?) async throws -> Data
 }
 
-/// Default implementation of the LoadAssetUseCase that uses an AssetRepository
-/// to handle the actual asset loading.
+// MARK: - Default Implementation
+
+/// The default ``LoadAssetUseCase`` implementation.
 ///
-/// This implementation:
-/// - Delegates the loading operation to the provided repository
-/// - Maintains a clean separation between use case and data layer
-/// - Ensures thread safety through Sendable conformance
+/// Delegates every request directly to the injected ``AssetRepository`` without
+/// adding additional business logic.  This keeps the use-case layer lightweight
+/// while still allowing callers to swap the repository — for example, to inject
+/// a mock in unit tests.
 internal final class DefaultLoadAssetUseCase: LoadAssetUseCase {
-    
-    /// The repository responsible for actual asset loading and caching
+
+    // MARK: Private State
+
     private let repository: AssetRepository
-    
-    /// Creates a new DefaultLoadAssetUseCase instance.
-    /// - Parameter repository: The repository to use for loading assets.
-    ///                        This repository will handle both network requests and caching.
+
+    // MARK: Init
+
+    /// Creates a use case backed by the given repository.
+    ///
+    /// - Parameter repository: The data source responsible for fetching
+    ///   and caching raw asset bytes.
     internal init(repository: AssetRepository) {
         self.repository = repository
     }
-    
-    /// Executes the asset loading operation by delegating to the repository.
-    /// - Parameter url: The URL of the asset to load
-    /// - Returns: The loaded asset data
-    /// - Throws: An error if the asset loading fails
+
+    // MARK: LoadAssetUseCase
+
     internal func execute(url: URL?) async throws -> Data {
         try await repository.loadAsset(with: url)
     }
