@@ -8,6 +8,7 @@
 import CoreGraphics
 import Foundation
 
+
 /// A unique, hashable identifier for a decoded image entry in ``DecodedImageCache``.
 ///
 /// Two keys are equal — and therefore share the same decoded cache entry — only when
@@ -42,6 +43,9 @@ struct CacheKey: Hashable, Sendable {
 //        let sizeTag = targetSize.map { "\(Int($0.width))x\(Int($0.height))" } ?? "full"
 //        let raw = "\(url.absoluteString)@@\(scale)@@\(sizeTag)"
 //        return String(format: "%llx", UInt64(bitPattern: Int64(raw.hashValue)))
-        return String(format: "%llx", UInt64(bitPattern: Int64(url.absoluteString.hashValue)))
+      //  return String(format: "%llx", UInt64(bitPattern: Int64(url.absoluteString.hashValue)))
+        let allowedChars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "."))
+        return url.absoluteString.suffix(70)
+            .addingPercentEncoding(withAllowedCharacters: allowedChars) ?? url.absoluteString
     }
 }

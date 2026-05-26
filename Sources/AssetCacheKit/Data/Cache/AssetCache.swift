@@ -181,6 +181,9 @@ actor AssetCache {
 
     /// Derives a filesystem-safe disk key from a URL.
     private func diskKey(for url: URL) -> String {
-        String(format: "%llx", UInt64(bitPattern: Int64(url.absoluteString.hashValue)))
+        //String(format: "%llx", UInt64(bitPattern: Int64(url.absoluteString.hashValue)))
+        let allowedChars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "."))
+        return url.absoluteString.suffix(70)
+            .addingPercentEncoding(withAllowedCharacters: allowedChars) ?? url.absoluteString
     }
 }
