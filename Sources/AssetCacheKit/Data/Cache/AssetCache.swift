@@ -175,13 +175,13 @@ actor AssetCache {
         return data
     }
 
-    private func storeInMemory(_ data: Data, for url: URL) {
+    internal func storeInMemory(_ data: Data, for url: URL) {
         memory.setObject(data as NSData, forKey: url as NSURL, cost: data.count)
     }
 
     /// Derives a filesystem-safe disk key from a URL.
     private func diskKey(for url: URL) -> String {
-        //String(format: "%llx", UInt64(bitPattern: Int64(url.absoluteString.hashValue)))
+        
         let allowedChars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "."))
         return url.absoluteString.suffix(70)
             .addingPercentEncoding(withAllowedCharacters: allowedChars) ?? url.absoluteString

@@ -40,10 +40,7 @@ struct CacheKey: Hashable, Sendable {
     /// Used as the key string passed to `NSCache`.  Derived by hashing the
     /// combination of ``url``, ``scale``, and ``targetSize``.
     var diskIdentifier: String {
-//        let sizeTag = targetSize.map { "\(Int($0.width))x\(Int($0.height))" } ?? "full"
-//        let raw = "\(url.absoluteString)@@\(scale)@@\(sizeTag)"
-//        return String(format: "%llx", UInt64(bitPattern: Int64(raw.hashValue)))
-      //  return String(format: "%llx", UInt64(bitPattern: Int64(url.absoluteString.hashValue)))
+
         let allowedChars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "."))
         return url.absoluteString.suffix(70)
             .addingPercentEncoding(withAllowedCharacters: allowedChars) ?? url.absoluteString
