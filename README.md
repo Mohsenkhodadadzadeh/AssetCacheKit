@@ -1,6 +1,6 @@
 # AssetCacheKit
 
-![Alt text](readmeAssets/AssetCacheKit.png)
+![AssetCacheKit](readmeAssets/AssetCacheKit.png)
 
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange?style=flat-square)](https://img.shields.io/badge/Swift-6.0-orange?style=flat-square)
 [![Platforms](https://img.shields.io/badge/Platforms-iOS_15.0-yellow?style=flat-square)](https://img.shields.io/badge/Platforms-iOS_15.0-yellow?style=flat-square)
@@ -11,50 +11,54 @@
 
 **A Swift package that provides a generic and efficient way to asynchronously load and cache assets in SwiftUI applications.**
 
-## Overview
-`AssetCacheKit` is a powerful and flexible Swift package that provides an elegant solution for asynchronous asset loading and caching in SwiftUI applications. It offers a clean, protocol-oriented approach to handle various types of assets (images, PDFs, SVGs, etc.) with built-in caching capabilities and error handling.
+---
 
+## Overview
+
+`AssetCacheKit` is a powerful and flexible Swift package that provides an elegant solution for asynchronous asset loading and caching in SwiftUI applications. It offers a clean, protocol-oriented approach to handle various types of assets — images, PDFs, SVGs, and more — with a two-layer caching system, request deduplication, LRU eviction, and configurable retry logic built in.
+
+---
 
 ## Features
- - **Generic Asset Loading:** Supports loading any type of asset by implementing the `AssetLoader` protocol.
- - **Caching:** Leverages `URLCache` for optimized performance by caching loaded assets.
- - **Placeholder & Error Handling:** Provides a consistent approach to displaying placeholders while loading and managing errors.
- - **SwiftUI Integration:** Integrates seamlessly with SwiftUI views using the `AssetCacheKit` view.
- - **Asset Types Support:** Currently supports images and PDFs, with plans for SVG, Video, and MP3 support in the future.
- 
 
+- 🚀 **Asynchronous asset loading** with seamless SwiftUI integration
+- 💾 **Two-layer cache** — in-memory NSCache for raw compressed bytes + persistent disk cache with expiration and LRU eviction
+- 🖼️ **Decoded image cache** — stores already-decompressed `UIImage`/`NSImage` objects to eliminate repeated decoding on scroll
+- 🔁 **Request deduplication** — concurrent requests for the same URL share a single in-flight task; the network is queried at most once
+- ⚙️ **Configurable caching** — tune memory limits, disk quota, expiration, and retry policy per cache instance
+- 🔄 **Automatic retry** with exponential back-off on transient network failures
+- 🎨 **Customizable placeholder views** during loading
+- ⚠️ **Strongly-typed error handling** via `AppError`
+- 📐 **Downsampling support** for images — decode only the pixels that fit on screen using ImageIO
+- 📱 **Multi-platform** — iOS 15+, macOS 12+, tvOS 15+, watchOS 8+
+- 🧩 **Protocol-oriented design** — implement `AssetLoader` or `AssetRepository` to load any asset type from any source
+- 🧪 **Fully tested** — comprehensive unit and UI test suite covering all caching layers, loaders, and error paths
 
-## Benefits
- - **Improved Performance:** Caching reduces network requests and improves loading times.
- - **Simplified Code:** Streamlines asynchronous asset loading logic and error handling.
- - **Enhanced User Experience:** Provides a smooth user experience by avoiding unnecessary UI stalls during loading in addition of avoids UI stalls with placeholder views and error handling during asset loading.
- - 🚀 Asynchronous asset loading with SwiftUI integration
- - 💾 Built-in caching mechanism
- - 🎨 Customizable placeholder views during loading
- - ⚠️ Elegant error handling
- - 🔄 Automatic retry mechanism
- - 📱 Support for multiple platforms (iOS, macOS, tvOS, watchOS)
- - 🧩 Protocol-oriented design for easy extensibility
- 
+---
+
 ## Requirements
 
-- iOS 15.0+
-- macOS 12.0+
-- tvOS 15.0+
-- watchOS 8.0+
-- Swift 6.0+
+| Platform | Minimum Version |
+|----------|----------------|
+| iOS      | 15.0+          |
+| macOS    | 12.0+          |
+| tvOS     | 15.0+          |
+| watchOS  | 8.0+           |
+| Swift    | 6.0+           |
+
+---
 
 ## Installation
 
 ### Swift Package Manager
 
-Add AssetCacheKit to your project through Xcode:
+**Via Xcode:**
 
-1. File > Add Packages...
+1. File → Add Packages…
 2. Enter the package URL: `https://github.com/Mohsenkhodadadzadeh/AssetCacheKit`
 3. Select the version you want to use
 
-Or add it to your `Package.swift` file:
+**Via `Package.swift`:**
 
 ```swift
 dependencies: [
@@ -62,102 +66,155 @@ dependencies: [
 ]
 ```
 
+---
 
 ## Usage
-**Loading Images**
-```Swift
+
+### Loading Images
+
+```swift
 import AssetCacheKit
 import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-    
-    AssetCacheKit(loader: CachedImageLoader(url: URL(string: "https://example.come/example.png")))
-        { image in
+        AssetCacheKit(
+            loader: CachedImageLoader(url: URL(string: "https://example.com/photo.jpg"))
+        ) { image in
             image
                 .resizable()
-                .scaledToFit()
+                .scaledToFill()
         } placeholder: {
             ProgressView()
         } error: { error in
-            Text("Error is \(error.localizedDescription)")
+            Text(error.localizedDescription)
         }
     }
 }
 ```
 
-In this example, `AssetCacheKit` is used to load an image from a URL. You provide a `CachedImageLoader` instance as the loader, a closure to build the content view with the loaded image, and a closure to display a placeholder during loading.
+---
 
-**Loading PDFs with CachedPDFLoader**
-```Swift
+### Loading PDFs
+
+```swift
 import AssetCacheKit
 import SwiftUI
 
-struct ContentView: View {
-    @State private var totalPage: Int? = nil
+struct PDFView: View {
+    @State private var totalPages: Int? = nil
     @State private var currentPage: Int? = nil
+
     var body: some View {
-    
-        AssetCacheKit(loader: CachedPDFLoader(url: URL(string: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf")))
-        { pdf in
+        AssetCacheKit(
+            loader: CachedPDFLoader(url: URL(string: "https://example.com/document.pdf"))
+        ) { pdf in
             pdf
-                .autoScale(true)               // Automatically scales the PDF to fit the view
-                .displayMode(.twoUpContinuous) // Displays the PDF with two pages side by side and continuous scrolling
-                .displayDirection(.vertical)   // Makes the PDF scroll vertically
-                .totalPage($totalPage)         // Binds the total number of pages in the PDF to a state variable
-                .currentPage($currentPage)     // Binds the current page number to a state variable
-        } placeholder: {
-            Text("Loading...")
-        } error: { err in
-            Text("Error is: \(err)")
-        }
-        if let totalPage, let currentPage {
-            Text("Page \(currentPage) from \(totalPage)")
-        }
-    }
-}
-
-```
-
-The CachedPDFLoader works similarly to the image loader but for PDF documents. It loads and caches the PDF file and displays it in a SwiftUI view. Here are some view modifiers you can apply:
- - **autoScale(_):** Automatically scales the PDF to fit the view’s dimensions.
- - **displayMode(_:):** Sets how the PDF pages are displayed (e.g., `.singlePage`, `.twoUpContinuous`).
- - **displayDirection(_:):** Specifies the scroll direction of the PDF pages (e.g., `.horizontal`, `.vertical`).
- - **totalPage(_:):** Binds to an `Int?` to provide the total number of pages in the PDF document. This binding is updated automatically when the PDF is fully loaded.
- - **currentPage(_:):** Binds to an `Int?` to track the currently displayed page number. This binding is updated as the user navigates through the PDF pages.
- 
-These modifiers allow for customization of how the PDF is presented and interacted with in your app.
-
-
-**Loading SVGs with CachedSVGLoader**
-```Swift
-import AssetCacheKit
-import SwiftUI
-
-struct ContentView: View {
-    var body: some View {
-        AssetCacheKit(loader: CachedSVGLoader(url: URL(string: "https://example.com/example.svg"))) { image in
-                image
-                    .resizable()
-                    .frame(width: 350, height: 200)
+                .autoScale(true)
+                .displayMode(.twoUpContinuous)
+                .displayDirection(.vertical)
+                .totalPage($totalPages)
+                .currentPage($currentPage)
         } placeholder: {
             ProgressView()
-        } error: { err in
-            Text(err.localizedDescription)
+        } error: { error in
+            Text(error.localizedDescription)
+        }
+
+        if let total = totalPages, let current = currentPage {
+            Text("Page \(current) of \(total)")
         }
     }
 }
 ```
-CachedSVGLoader enables loading and caching of **SVG images** from remote URLs. It integrates seamlessly with **AssetCacheKit**, ensuring efficient retrieval and rendering of SVG assets while reducing redundant network requests.
 
+**PDF view modifiers:**
 
+| Modifier | Description |
+|---|---|
+| `.autoScale(_:)` | Automatically scales the PDF to fit the view |
+| `.displayMode(_:)` | `.singlePage`, `.singlePageContinuous`, `.twoUp`, `.twoUpContinuous` |
+| `.displayDirection(_:)` | `.horizontal` or `.vertical` scrolling |
+| `.totalPage(_:)` | Binding updated with total page count once the document loads |
+| `.currentPage(_:)` | Binding updated as the user navigates pages |
+
+---
+
+### Loading SVGs
+
+```swift
+import AssetCacheKit
+import SwiftUI
+
+struct SVGView: View {
+    var body: some View {
+        AssetCacheKit(
+            loader: CachedSVGLoader(url: URL(string: "https://example.com/icon.svg"))
+        ) { image in
+            image
+                .resizable()
+                .frame(width: 200, height: 200)
+        } placeholder: {
+            ProgressView()
+        } error: { error in
+            Text(error.localizedDescription)
+        }
+    }
+}
+```
+
+> **Note:** SVG rendering uses Apple's private CoreSVG framework. This works correctly in apps distributed outside the App Store and in simulator builds, but may be rejected by App Store review. A public-API SVG renderer is planned for a future release.
+
+---
+
+## Cache Configuration
+
+The shared `AssetCache` is used by all built-in loaders by default. You can create an independent cache instance with custom limits for specific use cases:
+
+```swift
+let thumbnailCache = AssetCache(configuration: AssetCacheConfiguration(
+    rawDataMemoryByteLimit: 10 * 1_024 * 1_024,   // 10 MB in memory
+    diskByteLimit:          100 * 1_024 * 1_024,   // 100 MB on disk
+    defaultExpiration:      3 * 24 * 60 * 60,      // 3 days
+    retryPolicy: RetryPolicy(maxAttempts: 5, initialDelay: 1.0, multiplier: 2.0)
+))
+```
+
+**Default values for `AssetCache.shared`:**
+
+| Property | Default |
+|---|---|
+| `rawDataMemoryByteLimit` | 80 MB |
+| `diskByteLimit` | 512 MB |
+| `defaultExpiration` | 365 days |
+| `retryPolicy` | 3 attempts, 0.5 s initial delay, 2× back-off |
+
+### Clearing the Cache
+
+```swift
+// Clear only the in-memory layer (disk entries are preserved)
+await AssetCache.shared.clearMemory()
+
+// Clear both memory and disk
+await AssetCache.shared.clearAll()
+```
+
+### Prefetching
+
+Warm the cache ahead of time so assets are ready before they appear on screen:
+
+```swift
+AssetCache.shared.prefetch(urls: [url1, url2, url3])
+```
+
+---
 
 ## Custom Asset Loaders
 
 Create your own asset loader by conforming to the `AssetLoader` protocol:
 
 ```swift
-struct CustomAssetLoader: AssetLoader {
+struct AudioLoader: AssetLoader {
     var url: URL?
     
     func loadAsset() async throws -> YourAssetType {
@@ -166,63 +223,141 @@ struct CustomAssetLoader: AssetLoader {
 }
 ```
 
-### Asset Repository
-
-The package includes a repository layer for managing asset caching and network operations:
+Then use it exactly like the built-in loaders:
 
 ```swift
-class YourCustomRepository: AssetRepository {
-    func loadAsset(with url: URL?) async throws -> Data {
-        // Implement loading logic
-    }
-    
-    func fetchCachedAsset(for urlRequest: URLRequest) -> Data? {
-        // Implement cache retrieval
-    }
-    
-    func cacheAsset(response: HTTPURLResponse, data: Data, for urlRequest: URLRequest) {
-        // Implement caching logic
-    }
-    
-    func clearCache(for urlRequest: URLRequest) {
-        // Implement cache clearing
-    }
+AssetCacheKit(loader: AudioLoader(url: url)) { audioFile in
+    AudioPlayerView(file: audioFile)
+} placeholder: {
+    ProgressView()
+} error: { error in
+    Text(error.localizedDescription)
 }
 ```
 
+---
+
+## Custom Asset Repositories
+
+Provide a custom `AssetRepository` to load assets from a non-standard source — a local bundle, an encrypted store, or a mock for testing:
+
+```swift
+struct BundleAssetRepository: AssetRepository {
+    func loadAsset(with url: URL?) async throws -> Data {
+        guard let url,
+              let name = url.pathComponents.last,
+              let fileURL = Bundle.main.url(forResource: name, withExtension: nil)
+        else { throw AppError.assetLoading(.invalidURL) }
+        return try Data(contentsOf: fileURL)
+    }
+}
+
+// Inject into any built-in loader via the internal initialiser
+let loader = CachedPDFLoader(
+    url: url,
+    loadAssetUseCase: DefaultLoadAssetUseCase(repository: BundleAssetRepository())
+)
+```
+
+---
+
+## Error Handling
+
+All errors are reported as `AppError`, a strongly-typed enum with two cases:
+
+```swift
+public enum AppError: Error, Equatable {
+    case assetLoading(AssetLoadingError)
+    case network(NetworkError)
+}
+```
+
+**Asset loading errors:**
+
+| Case | Meaning |
+|---|---|
+| `.invalidURL` | The URL was nil or malformed |
+| `.invalidImageData` | Bytes could not be decoded as an image |
+| `.invalidPDFData` | Bytes could not be parsed as a PDF |
+| `.invalidSVGData` | Bytes could not be rendered as SVG |
+| `.invalidResponse` | Server returned a non-2xx response |
+
+**Network errors** include `.noConnection`, `.timeout`, `.cannotFindHost`, `.badServerResponse(statusCode:)`, and more — see `NetworkError` in the source for the full list.
+
+---
+
 ## Architecture
 
-AssetCacheKit follows a clean architecture pattern with three main layers:
+AssetCacheKit follows a clean, layered architecture:
 
-- **Presentation**: SwiftUI views and view models
-- **Domain**: Core business logic, protocols, and use cases
-- **Data**: Implementation of repositories and data sources
+```
+┌─────────────────────────────────────────┐
+│  Presentation                           │
+│  AssetCacheKit (SwiftUI view)           │
+│  AsyncPhase<Asset>                      │
+└────────────────┬────────────────────────┘
+                 │
+┌────────────────▼────────────────────────┐
+│  Domain                                 │
+│  AssetLoader protocol                   │
+│  LoadAssetUseCase protocol              │
+│  CachedImageLoader / CachedPDFLoader    │
+│  CachedSVGLoader                        │
+└────────────────┬────────────────────────┘
+                 │
+┌────────────────▼────────────────────────┐
+│  Data                                   │
+│  AssetRepository protocol               │
+│  DefaultAssetRepository                 │
+│  AssetCache (memory + disk)             │
+│  DecodedImageCache                      │
+│  DiskCache                              │
+│  NetworkFetcher                         │
+└─────────────────────────────────────────┘
+```
 
-### Key Components
+### Cache Layer Detail
 
-- `AssetCacheKit`: The main SwiftUI view that handles the asset loading UI
-- `AssetLoader`: Protocol defining the contract for asset loading
-- `AssetRepository`: Protocol for managing asset storage and retrieval
-- `AsyncPhase`: Enum representing the different states of asset loading
+```
+Request
+   │
+   ▼
+DecodedImageCache          ← decoded PlatformImage (images only)
+   │ miss
+   ▼
+AssetCache (NSCache)       ← compressed raw bytes, in memory
+   │ miss
+   ▼
+DiskCache                  ← compressed raw bytes, on disk
+   │ miss                     LRU eviction + per-entry expiration
+   ▼
+NetworkFetcher             ← URLSession with exponential back-off retry
+   │
+   └──► writes to DiskCache + NSCache before returning
+```
+
+**Request deduplication:** concurrent requests for the same URL attach to a single in-flight `Task`; the network is queried at most once per URL regardless of how many callers are waiting.
+
+---
 
 ## Best Practices
 
-1. **Memory Management**
-   - Assets are automatically cached and managed
-   - Large assets are handled efficiently to prevent memory issues
+**Use `targetSize` for thumbnails.** Passing a `targetSize` to `CachedImageLoader` uses ImageIO to decode only the pixels that fit on screen, reducing peak memory by up to 99% for large source images.
 
-2. **Error Handling**
-   - Comprehensive error handling with custom error types
-   - User-friendly error messages and recovery options
+**Prefetch visible URLs.** Call `AssetCache.shared.prefetch(urls:)` when you know which assets will appear next — for example, in `onAppear` of the cell just before the edge of a scroll view.
 
-3. **Performance**
-   - Asynchronous loading to prevent UI blocking
-   - Efficient caching mechanism for faster subsequent loads
+**Tune limits per use case.** The shared cache is sized for general use. A secondary cache for low-priority background assets can use a smaller `rawDataMemoryByteLimit` to avoid competing with foreground assets under memory pressure.
 
+**Clear on logout.** Call `await AssetCache.shared.clearAll()` when a user logs out to prevent their cached assets from being served to the next user on a shared device.
+
+---
 
 ## Contribution
-We welcome contributions to improve `AssetCacheKit`. Feel free to submit pull requests that enhance functionality, fix bugs, or add documentation.
+
+Contributions are welcome. Please open an issue before submitting a pull request for significant changes. All pull requests should include tests covering the new or changed behaviour.
+
+---
 
 ## License
 
-AssetCacheKit is available under the MIT license. See the LICENSE file for more info.
+AssetCacheKit is available under the MIT license. See the [LICENSE](LICENSE) file for details.
