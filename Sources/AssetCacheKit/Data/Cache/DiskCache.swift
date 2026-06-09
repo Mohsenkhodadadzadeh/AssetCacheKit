@@ -10,11 +10,16 @@ import Foundation
 /// A persistent, file-system-backed cache with per-entry expiration and LRU eviction.
 ///
 /// `DiskCache` stores arbitrary asset data (images, PDFs, SVGs, audio, video, etc.)
-/// as pairs of files inside a private subdirectory of the system caches folder:
+/// as pairs of files inside a private subdirectory of the configured system directory:
 ///
 /// - `<id>.cache` — the raw bytes of the asset.
 /// - `<id>.meta`  — a JSON-encoded ``DiskCacheMetadata`` file containing creation
 ///   date, expiration date, and file size.
+///
+/// The root directory is determined by the ``StorageDirectory`` passed at
+/// initialisation time — either `.cachesDirectory` (the default) or
+/// `.documentDirectory`.  This value is set once by ``AssetCache`` and never
+/// changes for the lifetime of the cache.
 ///
 /// ## Expiration
 ///
@@ -46,22 +51,30 @@ actor DiskCache {
 
     // MARK: - Init
 
-    /// Creates a `DiskCache` inside a named subdirectory of the system caches folder.
+    /// Creates a `DiskCache` inside a named subdirectory of the specified system directory.
     ///
     /// - Parameters:
     ///   - namespace: A reverse-DNS string used as the subdirectory name
     ///     (e.g. `"com.assetcachekit.assets"`).  Different namespaces are fully
     ///     independent; they share no state and can have different limits.
+    ///   - storageDirectory: The system directory that should hold the cache folder.
+    ///     Defaults to ``StorageDirectory/cache`` (``FileManager/SearchPathDirectory/cachesDirectory``).
     ///   - byteLimit: Maximum total disk usage in bytes before LRU eviction begins.
     ///   - defaultExpiration: Lifetime applied to every entry written through ``store(data:for:)``.
-    init(namespace: String, byteLimit: Int, defaultExpiration: TimeInterval) {
+    init(
+        namespace: String,
+        storageDirectory: StorageDirectory = .cache,
+        byteLimit: Int,
+        defaultExpiration: TimeInterval
+    ) {
         self.byteLimit         = byteLimit
         self.defaultExpiration = defaultExpiration
 
-        let caches = FileManager.default
-            .urls(for: .cachesDirectory, in: .userDomainMask)
+        // Resolve the base system directory from the StorageDirectory enum value.
+        let base = FileManager.default
+            .urls(for: storageDirectory.searchPathDirectory, in: .userDomainMask)
             .first!
-        directory = caches.appendingPathComponent(namespace, isDirectory: true)
+        directory = base.appendingPathComponent(namespace, isDirectory: true)
 
         try? FileManager.default.createDirectory(
             at: directory,
