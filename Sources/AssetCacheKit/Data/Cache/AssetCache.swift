@@ -15,6 +15,27 @@ import Foundation
 /// rather than decoded objects, keeping the memory footprint small and the
 /// implementation fully generic.
 ///
+/// ## Global configuration
+///
+/// Call ``configure(_:)`` **once** at app startup, before any loader is used,
+/// to customise the shared cache — including the storage directory:
+///
+/// ```swift
+/// // AppDelegate.application(_:didFinishLaunchingWithOptions:)
+/// // — or — the @main App.init()
+/// AssetCache.configure(
+///     AssetCacheConfiguration(storageDirectory: .document)
+/// )
+/// ```
+///
+/// After that single call, every `CachedImageLoader`, `CachedPDFLoader`, and
+/// `CachedSVGLoader` automatically uses the Documents directory without any
+/// per-request configuration.
+///
+/// If ``configure(_:)`` is never called, ``AssetCache/shared`` falls back to
+/// ``AssetCacheConfiguration/default``, which targets the Caches directory —
+/// preserving full backward compatibility.
+///
 /// ## Cache layers
 ///
 /// Requests are served from the fastest available source:
@@ -41,25 +62,51 @@ import Foundation
 /// - Note: For images, ``CachedImageLoader`` supplements `AssetCache` with a
 ///   ``DecodedImageCache`` that stores already-decoded ``PlatformImage`` objects,
 ///   eliminating repeated decompression on every display cycle.
-///
-/// ## Usage
-///
-/// ```swift
-/// // Using the shared instance (all built-in loaders use this)
-/// let data = try await AssetCache.shared.data(for: url)
-///
-/// // Custom configuration for a secondary cache
-/// let thumbCache = AssetCache(configuration: AssetCacheConfiguration(
-///     rawDataMemoryByteLimit: 5 * 1_024 * 1_024,
-///     diskByteLimit:         50 * 1_024 * 1_024
-/// ))
-/// ```
 actor AssetCache {
 
-    // MARK: - Singleton
+    // MARK: - Singleton & Global Configuration
 
     /// The shared `AssetCache` instance used by all built-in loaders.
-    static let shared = AssetCache()
+    ///
+    /// Always access the shared instance *after* calling ``configure(_:)``
+    /// during app startup.  The instance is created lazily on first access,
+    /// so configuration applied before first use is guaranteed to take effect.
+    static let shared: AssetCache = {
+        AssetCache(configuration: _pendingConfiguration ?? .default)
+    }()
+
+    /// Backing store for the configuration set by ``configure(_:)``.
+    ///
+    /// `nonisolated(unsafe)` is intentional: this value is written exactly once
+    /// on the main thread during app startup (before any concurrent access),
+    /// and read exactly once inside the `shared` lazy initialiser, also before
+    /// any concurrent access.  The write-before-read ordering is guaranteed by
+    /// the requirement that ``configure(_:)`` be called before the first asset
+    /// load.  No locking is needed for a single-writer, single-reader pattern
+    /// with this ordering guarantee.
+    private nonisolated(unsafe) static var _pendingConfiguration: AssetCacheConfiguration?
+
+    /// Configures the shared ``AssetCache`` instance.
+    ///
+    /// Call this **once**, before any loader is used — typically in
+    /// `AppDelegate.application(_:didFinishLaunchingWithOptions:)` or your
+    /// SwiftUI `App.init()`.
+    ///
+    /// ```swift
+    /// AssetCache.configure(
+    ///     AssetCacheConfiguration(storageDirectory: .document)
+    /// )
+    /// ```
+    ///
+    /// Calling this method after ``shared`` has already been accessed has no
+    /// effect; the shared instance retains its original configuration.
+    ///
+    /// - Parameter configuration: The configuration to apply to the shared cache.
+    static func configure(_ configuration: AssetCacheConfiguration) {
+        // Only honoured if `shared` has not been accessed yet.
+        guard _pendingConfiguration == nil else { return }
+        _pendingConfiguration = configuration
+    }
 
     // MARK: - Private State
 
@@ -82,12 +129,13 @@ actor AssetCache {
     /// Creates an `AssetCache` with the given configuration.
     ///
     /// - Parameter configuration: Tuning parameters for memory limits, disk
-    ///   quota, expiration, and retry behaviour.
+    ///   quota, expiration, retry behaviour, and storage directory.
     ///   Defaults to ``AssetCacheConfiguration/default``.
     init(configuration: AssetCacheConfiguration = .default) {
         config = configuration
         disk   = DiskCache(
             namespace: "com.assetcachekit.assets",
+            storageDirectory: configuration.storageDirectory,
             byteLimit: configuration.diskByteLimit,
             defaultExpiration: configuration.defaultExpiration
         )
@@ -181,7 +229,6 @@ actor AssetCache {
 
     /// Derives a filesystem-safe disk key from a URL.
     private func diskKey(for url: URL) -> String {
-        
         let allowedChars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "."))
         return url.absoluteString.suffix(70)
             .addingPercentEncoding(withAllowedCharacters: allowedChars) ?? url.absoluteString
