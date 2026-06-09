@@ -62,7 +62,7 @@ import Foundation
 /// - Note: For images, ``CachedImageLoader`` supplements `AssetCache` with a
 ///   ``DecodedImageCache`` that stores already-decoded ``PlatformImage`` objects,
 ///   eliminating repeated decompression on every display cycle.
-actor AssetCache {
+public actor AssetCache {
 
     // MARK: - Singleton & Global Configuration
 
