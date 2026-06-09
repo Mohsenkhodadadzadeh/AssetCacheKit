@@ -71,7 +71,7 @@ public actor AssetCache {
     /// Always access the shared instance *after* calling ``configure(_:)``
     /// during app startup.  The instance is created lazily on first access,
     /// so configuration applied before first use is guaranteed to take effect.
-    static let shared: AssetCache = {
+    public static let shared: AssetCache = {
         AssetCache(configuration: _pendingConfiguration ?? .default)
     }()
 
@@ -102,7 +102,7 @@ public actor AssetCache {
     /// effect; the shared instance retains its original configuration.
     ///
     /// - Parameter configuration: The configuration to apply to the shared cache.
-    static func configure(_ configuration: AssetCacheConfiguration) {
+    public static func configure(_ configuration: AssetCacheConfiguration) {
         // Only honoured if `shared` has not been accessed yet.
         guard _pendingConfiguration == nil else { return }
         _pendingConfiguration = configuration
@@ -131,7 +131,7 @@ public actor AssetCache {
     /// - Parameter configuration: Tuning parameters for memory limits, disk
     ///   quota, expiration, retry behaviour, and storage directory.
     ///   Defaults to ``AssetCacheConfiguration/default``.
-    init(configuration: AssetCacheConfiguration = .default) {
+    public init(configuration: AssetCacheConfiguration = .default) {
         config = configuration
         disk   = DiskCache(
             namespace: "com.assetcachekit.assets",
