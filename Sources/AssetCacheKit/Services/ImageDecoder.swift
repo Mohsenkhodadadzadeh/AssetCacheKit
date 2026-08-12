@@ -69,13 +69,25 @@ enum ImageDecoder {
     ) async throws -> PlatformImage {
         try await Task.detached(priority: .userInitiated) {
             if let targetSize {
-                return try downsample(data: data, to: targetSize, scale: scale)
+                return DecodedImage(try downsample(data: data, to: targetSize, scale: scale))
             }
-            return try decode(data: data, scale: scale)
-        }.value
+            return DecodedImage(try decode(data: data, scale: scale))
+        }.value.image
     }
 
     // MARK: - Private
+
+    /// Carries a freshly decoded image out of the decoding task.
+    ///
+    /// `NSImage` only gained a `Sendable` conformance in macOS 14, so returning
+    /// a ``PlatformImage`` straight out of `Task.detached` is not expressible on
+    /// the older releases this package supports.  The transfer is nonetheless
+    /// safe: the image is constructed inside the task and no other reference to
+    /// it exists at the moment it is handed back.
+    private struct DecodedImage: @unchecked Sendable {
+        let image: PlatformImage
+        init(_ image: PlatformImage) { self.image = image }
+    }
 
     /// Produces a scaled thumbnail using `CGImageSourceCreateThumbnailAtIndex`.
     ///
@@ -105,7 +117,7 @@ enum ImageDecoder {
             throw AppError.assetLoading(.invalidImageData)
         }
 
-        return makePlatformImage(from: cgImage, size: targetSize, scale: scale)
+        return makePlatformImage(from: cgImage, scale: scale)
     }
 
     /// Decodes the full image and pre-renders it into an uncompressed bitmap.
@@ -123,15 +135,25 @@ enum ImageDecoder {
 #endif
     }
 
+    /// Wraps a decoded `CGImage` in the platform's image type.
+    ///
+    /// The point size is derived from the bitmap's real pixel dimensions rather
+    /// than from the requested `targetSize`.  `targetSize` is only a *bounding
+    /// box* — `kCGImageSourceThumbnailMaxPixelSize` preserves the source aspect
+    /// ratio — so a 16:9 photo asked to fit 80 × 80 comes back 80 × 45.
+    /// Declaring that bitmap as 80 × 80 would stretch it on screen.
     private static func makePlatformImage(
         from cgImage: CGImage,
-        size: CGSize,
         scale: CGFloat
     ) -> PlatformImage {
 #if os(macOS)
-        NSImage(cgImage: cgImage, size: size)
+        let pointSize = CGSize(
+            width: CGFloat(cgImage.width) / scale,
+            height: CGFloat(cgImage.height) / scale
+        )
+        return NSImage(cgImage: cgImage, size: pointSize)
 #else
-        UIImage(cgImage: cgImage, scale: scale, orientation: .up)
+        return UIImage(cgImage: cgImage, scale: scale, orientation: .up)
 #endif
     }
 }

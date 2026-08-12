@@ -72,19 +72,20 @@ public actor AssetCache {
     /// during app startup.  The instance is created lazily on first access,
     /// so configuration applied before first use is guaranteed to take effect.
     public static let shared: AssetCache = {
-        AssetCache(configuration: _pendingConfiguration ?? .default)
+        AssetCache(configuration: _configurationLock.withLock { _pendingConfiguration } ?? .default)
     }()
 
     /// Backing store for the configuration set by ``configure(_:)``.
     ///
-    /// `nonisolated(unsafe)` is intentional: this value is written exactly once
-    /// on the main thread during app startup (before any concurrent access),
-    /// and read exactly once inside the `shared` lazy initialiser, also before
-    /// any concurrent access.  The write-before-read ordering is guaranteed by
-    /// the requirement that ``configure(_:)`` be called before the first asset
-    /// load.  No locking is needed for a single-writer, single-reader pattern
-    /// with this ordering guarantee.
+    /// Guarded by ``_configurationLock``.  The intended usage — one write at
+    /// startup, one read on first access — would usually make synchronisation
+    /// unnecessary, but nothing *enforces* that ordering: an app that
+    /// configures off the main thread, or triggers a prefetch concurrently with
+    /// startup, would otherwise race on this property with no diagnostic. The
+    /// lock is uncontended in the expected case and taken at most twice.
     private nonisolated(unsafe) static var _pendingConfiguration: AssetCacheConfiguration?
+
+    private static let _configurationLock = NSLock()
 
     /// Configures the shared ``AssetCache`` instance.
     ///
@@ -104,8 +105,10 @@ public actor AssetCache {
     /// - Parameter configuration: The configuration to apply to the shared cache.
     public static func configure(_ configuration: AssetCacheConfiguration) {
         // Only honoured if `shared` has not been accessed yet.
-        guard _pendingConfiguration == nil else { return }
-        _pendingConfiguration = configuration
+        _configurationLock.withLock {
+            guard _pendingConfiguration == nil else { return }
+            _pendingConfiguration = configuration
+        }
     }
 
     // MARK: - Private State
@@ -154,7 +157,7 @@ public actor AssetCache {
     /// - Parameter url: The remote location of the asset.
     /// - Returns: The raw (compressed) asset bytes.
     /// - Throws: ``AppError/assetLoading(_:)`` or ``AppError/network(_:)`` on failure.
-    func data(for url: URL) async throws -> Data {
+    public func data(for url: URL) async throws -> Data {
 
         // ① Memory hit
         if let cached = memory.object(forKey: url as NSURL) {
@@ -182,7 +185,7 @@ public actor AssetCache {
     /// Errors are silently discarded so a failing prefetch never surfaces to the UI.
     ///
     /// - Parameter urls: The remote locations to prefetch.
-    func prefetch(urls: [URL]) {
+    public func prefetch(urls: [URL]) {
         for url in urls {
             Task { _ = try? await data(for: url) }
         }
@@ -194,15 +197,26 @@ public actor AssetCache {
     ///
     /// Disk entries are unaffected; subsequent requests are served from disk
     /// rather than the network.
-    func clearMemory() {
+    public func clearMemory() {
         memory.removeAllObjects()
     }
 
-    /// Removes all entries from both the memory and disk layers.
-    func clearAll() async {
+    /// Removes all entries from the memory layer, the disk layer, and the
+    /// decoded-image layer.
+    ///
+    /// ``DecodedImageCache`` is cleared too even though it is not one of this
+    /// actor's own layers.  It holds fully decoded bitmaps of previously loaded
+    /// images, so leaving it populated would keep serving the outgoing user's
+    /// photos on a shared device — defeating the point of a logout-time purge.
+    /// Over-clearing an in-memory cache costs at most one re-decode.
+    public func clearAll() async {
         memory.removeAllObjects()
+        DecodedImageCache.shared.clearAll()
         await disk.clearAll()
     }
+
+    /// The configuration this cache was created with.
+    public nonisolated var configuration: AssetCacheConfiguration { config }
 
     // MARK: - Private
 
@@ -228,9 +242,13 @@ public actor AssetCache {
     }
 
     /// Derives a filesystem-safe disk key from a URL.
+    ///
+    /// The key is a SHA-256 digest of the **whole** URL.  Truncating the URL
+    /// instead — for example to its last 70 characters — makes any two URLs
+    /// that share a tail collide, which is exactly the shape of a CDN path
+    /// (`.../v2/assets/thumb.jpg`), so one asset would be served in place of
+    /// another.
     private func diskKey(for url: URL) -> String {
-        let allowedChars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "."))
-        return url.absoluteString.suffix(70)
-            .addingPercentEncoding(withAllowedCharacters: allowedChars) ?? url.absoluteString
+        url.absoluteString.cacheDigest
     }
 }

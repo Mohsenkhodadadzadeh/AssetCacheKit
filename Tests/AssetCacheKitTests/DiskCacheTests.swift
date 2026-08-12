@@ -86,6 +86,74 @@ final class DiskCacheTests: XCTestCase {
         }
     }
  
+    // MARK: Byte accounting
+
+    func test_repeatedOverwrite_doesNotEvictLiveEntries() async {
+        // 8 KB budget, 1 KB payload. Overwriting one key 40 times must not be
+        // counted as 40 KB of usage and drag unrelated entries into eviction.
+        let small = DiskCache(
+            namespace: "com.assetcachekit.test.overwrite.\(UUID().uuidString)",
+            byteLimit: 8 * 1_024,
+            defaultExpiration: 3600
+        )
+        defer { Task { await small.clearAll() } }
+
+        let payload = Data(repeating: 0xAB, count: 1_024)
+        await small.store(data: payload, for: "keeper")
+
+        for _ in 0..<40 {
+            await small.store(data: payload, for: "churn")
+        }
+
+        let keeper = await small.data(for: "keeper")
+        XCTAssertEqual(keeper, payload,
+            "Overwriting one key must not inflate the byte count and evict others")
+        let churn = await small.data(for: "churn")
+        XCTAssertEqual(churn, payload)
+    }
+
+    func test_expiredEntries_doNotLeakIntoByteCount() async {
+        // Every entry expires immediately, so each read removes it. If those
+        // removals are not discounted, the running total climbs without bound
+        // and eventually evicts entries that are still live.
+        let expiring = DiskCache(
+            namespace: "com.assetcachekit.test.expiry.\(UUID().uuidString)",
+            byteLimit: 8 * 1_024,
+            defaultExpiration: -1
+        )
+        defer { Task { await expiring.clearAll() } }
+
+        let payload = Data(repeating: 0xCD, count: 1_024)
+        for i in 0..<20 {
+            await expiring.store(data: payload, for: "expired_\(i)")
+            _ = await expiring.data(for: "expired_\(i)")   // miss → removes the entry
+        }
+
+        // A fresh, non-expiring cache over the same directory should now be able
+        // to store and read back normally.
+        await expiring.store(data: payload, for: "final")
+        let final = await expiring.data(for: "final")
+        XCTAssertNil(final, "Entry written with a negative expiration is stale on read")
+    }
+
+    func test_evictionKeepsCacheWithinLimit() async {
+        let limited = DiskCache(
+            namespace: "com.assetcachekit.test.evict.\(UUID().uuidString)",
+            byteLimit: 4 * 1_024,
+            defaultExpiration: 3600
+        )
+        defer { Task { await limited.clearAll() } }
+
+        let payload = Data(repeating: 0xEF, count: 1_024)
+        for i in 0..<10 {
+            await limited.store(data: payload, for: "evict_\(i)")
+        }
+
+        // The most recent write must survive eviction.
+        let newest = await limited.data(for: "evict_9")
+        XCTAssertEqual(newest, payload, "The just-written entry should not be evicted")
+    }
+
     func test_diskKey_collision_differentURLs() async {
         // Two clearly distinct keys should not return each other's data
         let data1 = Data("asset1".utf8)

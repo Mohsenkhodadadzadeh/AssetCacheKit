@@ -38,11 +38,11 @@ struct CacheKey: Hashable, Sendable {
     /// A short, filesystem-safe string that uniquely identifies this key.
     ///
     /// Used as the key string passed to `NSCache`.  Derived by hashing the
-    /// combination of ``url``, ``scale``, and ``targetSize``.
+    /// combination of ``url``, ``scale``, and ``targetSize`` — all three must
+    /// take part, or a downsampled thumbnail and the full-resolution decode of
+    /// the same URL would share a single entry and hand back each other's pixels.
     var diskIdentifier: String {
-
-        let allowedChars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "."))
-        return url.absoluteString.suffix(70)
-            .addingPercentEncoding(withAllowedCharacters: allowedChars) ?? url.absoluteString
+        let sizeComponent = targetSize.map { "\($0.width)x\($0.height)" } ?? "native"
+        return "\(url.absoluteString)|scale=\(scale)|size=\(sizeComponent)".cacheDigest
     }
 }

@@ -5,6 +5,11 @@
 //  Created by mohsen on 1/20/25.
 //
 
+// PDFKit ships only on iOS and macOS — it does not exist on watchOS, and on
+// tvOS it offers no `PDFView`.  Everything in this file is therefore gated to
+// the two platforms that can actually render a PDF.
+#if os(iOS) || os(macOS)
+
 import PDFKit
 import SwiftUI
 
@@ -83,7 +88,13 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
         pdfView.autoScales = autoScale
         pdfView.displayMode = displayMode
         pdfView.displayDirection = displayDirection
-        pdfView.document = document
+        // Reassigning `document` reloads the view and snaps it back to page one.
+        // SwiftUI calls this on every state change, so only swap when the
+        // document has actually changed — otherwise the reader jumps to the
+        // start whenever anything else in the hierarchy updates.
+        if pdfView.document !== document {
+            pdfView.document = document
+        }
     }
     
     public func makeCoordinator() -> Coordinator {
@@ -251,7 +262,13 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
         pdfView.autoScales = autoScale
         pdfView.displayMode = displayMode
         pdfView.displayDirection = displayDirection
-        pdfView.document = document
+        // Reassigning `document` reloads the view and snaps it back to page one.
+        // SwiftUI calls this on every state change, so only swap when the
+        // document has actually changed — otherwise the reader jumps to the
+        // start whenever anything else in the hierarchy updates.
+        if pdfView.document !== document {
+            pdfView.document = document
+        }
     }
     
     
@@ -351,45 +368,93 @@ public struct PDFKitRepresentedView: NSViewRepresentable {
 /// A coordinator class responsible for observing page changes in a `PDFView` and updating the current page binding.
 ///
 /// `Coordinator` listens for page change notifications and updates the `currentPage` binding accordingly.
-public class Coordinator: NSObject, PDFViewDelegate {
-    
+///
+/// The type is `@MainActor`-isolated because every value it touches — the
+/// `PDFView`, its document, and the SwiftUI binding — is main-actor state.
+@MainActor
+public final class Coordinator: NSObject, PDFViewDelegate {
+
     /// A binding to the current page number in the PDF document.
     ///
     /// This binding is updated when the page changes in the associated `PDFView`.
     @Binding var currentPage: Int?
-    
+
+    /// The opaque token returned when registering the block-based observer.
+    ///
+    /// `removeObserver(_:name:object:)` only unregisters *selector*-based
+    /// observers; block-based ones must be removed with `removeObserver(_:)`
+    /// using this token, otherwise `NotificationCenter` retains the block —
+    /// and the `PDFView` it references — for the lifetime of the process.
+    ///
+    /// `nonisolated(unsafe)` is required so `deinit` (which is never
+    /// actor-isolated) can read it.  The property is only ever written from
+    /// the main actor, and `NotificationCenter` is itself thread-safe.
+    private nonisolated(unsafe) var pageChangeObserver: (any NSObjectProtocol)?
+
+    /// The `PDFView` currently being observed.
+    ///
+    /// Held weakly so the coordinator never keeps a torn-down view alive, and
+    /// read inside the notification block instead of unwrapping the (non-
+    /// `Sendable`) `Notification` payload.
+    private weak var observedPDFView: PDFView?
+
     /// Initializes a new `Coordinator` instance.
     ///
     /// - Parameter currentPage: A binding to an `Int?` representing the current page number.
     init(currentPage: Binding<Int?>) {
         self._currentPage = currentPage
     }
-    
+
     /// Observes page change events in the specified `PDFView` and updates the `currentPage` binding.
+    ///
+    /// Calling this more than once replaces the previous registration rather
+    /// than stacking a second one.
     ///
     /// - Parameter pdfView: The `PDFView` to observe for page changes.
     func observePageChanges(for pdfView: PDFView) {
-        NotificationCenter.default.addObserver(
+        removePageChangeObserver()
+        observedPDFView = pdfView
+
+        pageChangeObserver = NotificationCenter.default.addObserver(
             forName: Notification.Name.PDFViewPageChanged,
             object: pdfView,
             queue: .main
-        ) { [weak self] notification in
-            guard let self, let pdfView = notification.object as? PDFView else { return }
-            DispatchQueue.main.async {
-                guard let currentPage = pdfView.currentPage,
-                      let pageIndex = pdfView.document?.index(for: currentPage) else { return }
-                
-                self.currentPage = pageIndex + 1
-                print("📄 Current Page: \(pageIndex + 1)")
+        ) { [weak self] _ in
+            // The observer is registered on `.main`, so the block already runs
+            // on the main thread; `assumeIsolated` records that for the compiler
+            // without an extra async hop that would drop frames while scrolling.
+            MainActor.assumeIsolated {
+                self?.synchronizeCurrentPage()
             }
-            
         }
     }
-    
+
+    /// Reads the observed view's current page and pushes it into the binding.
+    private func synchronizeCurrentPage() {
+        guard let pdfView = observedPDFView,
+              let page = pdfView.currentPage,
+              let pageIndex = pdfView.document?.index(for: page)
+        else { return }
+
+        let pageNumber = pageIndex + 1
+        // Avoid redundant binding writes, which would invalidate the SwiftUI
+        // view on every scroll tick even when the page has not changed.
+        guard currentPage != pageNumber else { return }
+        currentPage = pageNumber
+    }
+
+    private nonisolated func removePageChangeObserver() {
+        guard let pageChangeObserver else { return }
+        NotificationCenter.default.removeObserver(pageChangeObserver)
+        self.pageChangeObserver = nil
+    }
+
     /// Cleans up the notification observer when the `Coordinator` is deallocated.
     deinit {
-        NotificationCenter.default.removeObserver(self, name: Notification.Name.PDFViewPageChanged, object: nil)
+        removePageChangeObserver()
     }
 }
+
+#endif  // os(iOS) || os(macOS)
 
 

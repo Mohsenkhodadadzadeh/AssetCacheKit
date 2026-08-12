@@ -59,6 +59,30 @@ final class DecodedImageCacheTests: XCTestCase {
         XCTAssertNil(cache.image(for: key), "Expired entry must return nil")
     }
  
+    func test_downsampledVariant_doesNotCollideWithFullResolution() {
+        let url       = URL(string: "https://example.com/photo.jpg")!
+        let thumbnail = CacheKey(url: url, scale: 1, targetSize: CGSize(width: 80, height: 80))
+        let fullSize  = CacheKey(url: url, scale: 1, targetSize: nil)
+
+        cache.store(makePlatformImage(), for: thumbnail, expiration: 3600)
+
+        XCTAssertNotNil(cache.image(for: thumbnail))
+        XCTAssertNil(cache.image(for: fullSize),
+            "Caching an 80×80 thumbnail must not satisfy a full-resolution request")
+    }
+
+    func test_differentScales_doNotCollide() {
+        let url  = URL(string: "https://example.com/photo.jpg")!
+        let at1x = CacheKey(url: url, scale: 1, targetSize: nil)
+        let at3x = CacheKey(url: url, scale: 3, targetSize: nil)
+
+        cache.store(makePlatformImage(), for: at1x, expiration: 3600)
+
+        XCTAssertNotNil(cache.image(for: at1x))
+        XCTAssertNil(cache.image(for: at3x),
+            "A 1x decode must not be served for a 3x request")
+    }
+
     func test_clearAll_removesAllEntries() {
         for i in 0..<5 {
             cache.store(makePlatformImage(), for: makeKey("_\(i)"), expiration: 3600)

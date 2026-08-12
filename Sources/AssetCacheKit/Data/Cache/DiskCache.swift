@@ -47,7 +47,13 @@ actor DiskCache {
     private let defaultExpiration: TimeInterval
 
     /// Running total of all `.cache` file sizes, kept in sync with every write and eviction.
+    ///
+    /// Only ever read through ``size()``, which performs the one-time
+    /// directory scan on first use.
     private var currentSize: Int = 0
+
+    /// Whether ``currentSize`` has been seeded from the on-disk contents yet.
+    private var didLoadSize = false
 
     // MARK: - Init
 
@@ -71,16 +77,21 @@ actor DiskCache {
         self.defaultExpiration = defaultExpiration
 
         // Resolve the base system directory from the StorageDirectory enum value.
+        // The search path can legitimately come back empty in sandboxed or
+        // command-line contexts, so fall back to the temporary directory rather
+        // than trapping on a force-unwrap.
         let base = FileManager.default
             .urls(for: storageDirectory.searchPathDirectory, in: .userDomainMask)
-            .first!
+            .first ?? FileManager.default.temporaryDirectory
         directory = base.appendingPathComponent(namespace, isDirectory: true)
 
         try? FileManager.default.createDirectory(
             at: directory,
             withIntermediateDirectories: true
         )
-        Task { await recalculateSize() }
+        // `currentSize` is seeded lazily by `size()` on first use.  Kicking off
+        // an unawaited `Task` here instead would let the scan land *after* early
+        // writes and clobber the byte count they contributed.
     }
 
     // MARK: - Read
@@ -132,10 +143,21 @@ actor DiskCache {
 
         guard let metaRaw = try? JSONEncoder().encode(meta) else { return }
 
-        try? data.write(to: dataURL, options: .atomic)
-        try? metaRaw.write(to: metaURL, options: .atomic)
+        // Overwriting an existing key replaces its bytes rather than adding to
+        // them, so drop the previous file's contribution before counting the
+        // new one — otherwise repeated writes to the same key inflate
+        // `currentSize` until eviction wipes the whole cache.
+        let previousSize = fileSize(at: dataURL)
 
-        currentSize += data.count
+        do {
+            try data.write(to: dataURL, options: .atomic)
+            try metaRaw.write(to: metaURL, options: .atomic)
+        } catch {
+            // The write failed; leave the byte count untouched.
+            return
+        }
+
+        currentSize = max(0, size() - previousSize) + data.count
         evictIfNeeded()
     }
 
@@ -149,6 +171,7 @@ actor DiskCache {
             withIntermediateDirectories: true
         )
         currentSize = 0
+        didLoadSize = true
     }
 
     // MARK: - LRU Eviction
@@ -156,7 +179,7 @@ actor DiskCache {
     /// Removes the least-recently-accessed `.cache` files until
     /// `currentSize` falls at or below ``byteLimit``.
     private func evictIfNeeded() {
-        guard currentSize > byteLimit else { return }
+        guard size() > byteLimit else { return }
 
         let fm = FileManager.default
         guard let contents = try? fm.contentsOfDirectory(
@@ -192,24 +215,56 @@ actor DiskCache {
 
     private func remove(key: String) {
         let (dataURL, metaURL) = fileURLs(for: key)
+
+        // Discount the bytes being dropped, otherwise expired and corrupt
+        // entries permanently inflate `currentSize` and eventually push the
+        // cache into evicting healthy entries it should have kept.
+        let removedSize = fileSize(at: dataURL)
+
         try? FileManager.default.removeItem(at: dataURL)
         try? FileManager.default.removeItem(at: metaURL)
+
+        currentSize = max(0, size() - removedSize)
     }
 
-    /// Scans the cache directory on start-up to restore an accurate size counter.
+    /// Returns the running byte total, scanning the directory once on first use.
+    private func size() -> Int {
+        if !didLoadSize {
+            didLoadSize = true
+            recalculateSize()
+        }
+        return currentSize
+    }
+
+    /// Scans the cache directory to restore an accurate size counter.
     ///
     /// This is necessary because the process may have been killed before a previous
     /// session's in-memory counter was persisted.
+    ///
+    /// Only `.cache` files are counted, matching what ``store(data:for:)`` adds
+    /// and what ``evictIfNeeded()`` subtracts.  Counting the `.meta` sidecars
+    /// here too would leave a floor of metadata bytes that eviction can never
+    /// reclaim, so a cache near its limit would delete every entry it holds and
+    /// still believe it was over budget.
     private func recalculateSize() {
         let fm = FileManager.default
         guard let contents = try? fm.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: [.fileSizeKey]
-        ) else { return }
+        ) else {
+            currentSize = 0
+            return
+        }
 
         currentSize = contents
+            .filter { $0.pathExtension == "cache" }
             .compactMap { try? $0.resourceValues(forKeys: [.fileSizeKey]).fileSize }
             .reduce(0, +)
+    }
+
+    /// Returns the on-disk size of `url` in bytes, or `0` when it does not exist.
+    private func fileSize(at url: URL) -> Int {
+        (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
     }
 
     /// Sets the modification date of `url` to the current time.

@@ -17,16 +17,13 @@ import PDFKit
  
 extension AssetCache {
     /// Seeds the memory layer directly — for tests only.
+    ///
+    /// The write happens inline on the actor, so by the time `await` returns the
+    /// bytes are guaranteed to be visible to the next `data(for:)` call.
+    /// Detaching it into an unawaited `Task` instead would let the loader run
+    /// first and fall through to a *real* network request, making every test
+    /// that primes the cache both slow and non-deterministic.
     func primeMemory(url: URL, data: Data) {
-        // Access the private NSCache via the existing storeInMemory method.
-        // Since it's private we call the actor-isolated wrapper via an actor hop.
-        Task { await _primeMemoryInternal(url: url, data: data) }
-    }
- 
-    /// Actor-isolated internal helper called by the test-only `primeMemory`.
-    func _primeMemoryInternal(url: URL, data: Data) {
-        // Directly write to memory by calling the existing private method.
-        // We expose it as internal here purely for test seeding.
         storeInMemory(data, for: url)
     }
 }

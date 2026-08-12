@@ -4,6 +4,10 @@
 //
 //  Created by mohsen on 1/20/25.
 //
+// Matches the availability of ``PDFKitRepresentedView``: PDFKit is absent on
+// watchOS and has no `PDFView` on tvOS, so the loader ships on iOS/macOS only.
+#if os(iOS) || os(macOS)
+
 import PDFKit
 import SwiftUI
 
@@ -105,3 +109,5 @@ public struct CachedPDFLoader: AssetLoader, Equatable {
         lhs.url == rhs.url
     }
 }
+
+#endif  // os(iOS) || os(macOS)

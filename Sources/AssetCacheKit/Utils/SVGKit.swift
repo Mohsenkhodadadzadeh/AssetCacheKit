@@ -44,64 +44,97 @@ nonisolated(unsafe) public let coreSVG = dlopen("/System/Library/PrivateFramewor
 /// Dynamically loads a symbol from the CoreSVG framework.
 /// - Parameter name: The name of the symbol to load.
 /// - Returns: The loaded symbol cast to the specified type.
+///
+/// - Warning: When CoreSVG is unavailable, or the symbol has been renamed by a
+///   future OS release, `dlsym` returns `nil` and the resulting function
+///   pointer is null.  Callers must check ``isCoreSVGAvailable`` before
+///   invoking any of the loaded symbols; calling a null pointer crashes.
 func load<T>(_ name: String) -> T {
     unsafeBitCast(dlsym(coreSVG, name), to: T.self)
 }
+
+/// Indicates whether the private CoreSVG framework — and every symbol this file
+/// depends on — could be resolved at runtime.
+///
+/// CoreSVG is not a public API.  It is absent on some platforms and could be
+/// removed or renamed in any OS update, so every entry point that would call
+/// into it checks this flag first and degrades to a decode failure rather than
+/// jumping through a null function pointer.
+let isCoreSVGAvailable: Bool = {
+    guard coreSVG != nil else { return false }
+    let symbols = [
+        "CGSVGDocumentRelease",
+        "CGSVGDocumentCreateFromData",
+        "CGContextDrawSVGDocument",
+        "CGSVGDocumentGetCanvasSize",
+    ]
+    return symbols.allSatisfy { dlsym(coreSVG, $0) != nil }
+}()
 
 /// A utility class for handling and rendering SVG images.
 public class SVGKit {
 
     /// Releases the allocated SVG document when the instance is deallocated.
-    deinit { CGSVGDocumentRelease(document) }
+    deinit {
+        guard let document else { return }
+        CGSVGDocumentRelease(document)
+    }
 
     /// The internal SVG document.
     var document: CGSVGDocument?
-    
+
     /// Initializes an `SVGKit` instance from an SVG string.
     /// - Parameter value: The SVG string.
     public convenience init?(_ value: String) {
         guard let data = value.data(using: .utf8) else { return nil }
         self.init(data)
     }
-   
+
     /// Initializes an `SVGKit` instance from raw SVG data.
     /// - Parameter data: The raw SVG data.
+    ///
+    /// Returns `nil` when CoreSVG is unavailable on this OS, when the bytes are
+    /// not parseable SVG, or when the parsed document has an empty canvas.
     public init?(_ data: Data) {
+        guard isCoreSVGAvailable else { return nil }
         guard let document = CGSVGDocumentCreateFromData(data as CFData, nil)?.takeUnretainedValue() else { return nil }
-        guard CGSVGDocumentGetCanvasSize(document) != .zero else { return nil }
+
+        // `CGSVGDocumentCreateFromData` follows the Core Foundation *create*
+        // rule and hands back a +1 reference.  Bailing out here without
+        // releasing it would leak the document, since `deinit` never runs on a
+        // failed initialiser.
+        guard CGSVGDocumentGetCanvasSize(document) != .zero else {
+            CGSVGDocumentRelease(document)
+            return nil
+        }
         self.document = document
     }
 
     /// The size of the SVG canvas.
     public var size: CGSize {
-        CGSVGDocumentGetCanvasSize(document)
+        guard let document else { return .zero }
+        return CGSVGDocumentGetCanvasSize(document)
     }
     
     /// Converts the SVG document into a SwiftUI Image.
     /// - Returns: A SwiftUI `Image` representation of the SVG.
     public func swiftUIImage() -> Image? {
         guard let platformImage = renderPlatformImage() else { return nil }
-#if os(iOS)
-        return Image(uiImage: platformImage)
-            .resizable()
-#elseif os(macOS)
+#if os(macOS)
         return Image(nsImage: platformImage)
             .resizable()
+#else
+        return Image(uiImage: platformImage)
+            .resizable()
 #endif
-        
     }
 
     /// Renders the SVG document as a PlatformImage.
     /// - Returns: A `PlatformImage` representing the SVG.
     private func renderPlatformImage() -> PlatformImage? {
-        guard let document else { return nil }
-        
-        #if os(iOS)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        return renderer.image { context in
-            CGContextDrawSVGDocument(context.cgContext, document)
-        }
-        #elseif os(macOS)
+        guard let document, size != .zero else { return nil }
+
+        #if os(macOS)
         let image = NSImage(size: size)
         image.lockFocusFlipped(true)
         if let context = NSGraphicsContext.current?.cgContext {
@@ -111,6 +144,38 @@ public class SVGKit {
         }
         image.unlockFocus()
         return nil
+        #elseif os(watchOS)
+        // watchOS has no `UIGraphicsImageRenderer`, so draw into a raw bitmap
+        // context and wrap the result.
+        let width  = Int(size.width.rounded())
+        let height = Int(size.height.rounded())
+
+        guard width > 0, height > 0,
+              let context = CGContext(
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
+                    | CGBitmapInfo.byteOrder32Little.rawValue
+              )
+        else { return nil }
+
+        // A bare `CGContext` has a bottom-left origin, while CoreSVG draws in a
+        // top-left space — flip before drawing so the render isn't upside down.
+        context.translateBy(x: 0, y: CGFloat(height))
+        context.scaleBy(x: 1, y: -1)
+        CGContextDrawSVGDocument(context, document)
+
+        guard let cgImage = context.makeImage() else { return nil }
+        return UIImage(cgImage: cgImage)
+        #else
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { context in
+            CGContextDrawSVGDocument(context.cgContext, document)
+        }
         #endif
     }
    

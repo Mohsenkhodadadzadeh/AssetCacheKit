@@ -7,7 +7,10 @@ let package = Package(
     name: "AssetCacheKit",
     platforms: [
         .iOS(.v13),
-        .macOS(.v14),
+        // Every public symbol is annotated `@available(macOS 12.0, ...)` and the
+        // README advertises macOS 12+. Declaring .v14 here contradicted both and
+        // made the package unresolvable for macOS 12/13 consumers.
+        .macOS(.v12),
         .tvOS(.v13),
         .watchOS(.v6)
     ],

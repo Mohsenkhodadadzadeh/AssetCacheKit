@@ -68,7 +68,9 @@ public struct CachedImageLoader: AssetLoader, Equatable {
     ///     these dimensions using ImageIO.  Pass `nil` to decode at full resolution.
     public init(url: URL?, scale: CGFloat = 1, targetSize: CGSize? = nil) {
         self.url          = url
-        self.scale        = scale
+        // A non-positive scale would make the decoder divide by zero when
+        // converting pixels back to points, so floor it at 1.
+        self.scale        = scale > 0 ? scale : 1
         self.targetSize   = targetSize
         self.assetCache   = .shared
         self.decodedCache = .shared
@@ -93,7 +95,7 @@ public struct CachedImageLoader: AssetLoader, Equatable {
         decodedCache: DecodedImageCache
     ) {
         self.url          = url
-        self.scale        = scale
+        self.scale        = scale > 0 ? scale : 1
         self.targetSize   = targetSize
         self.assetCache   = assetCache
         self.decodedCache = decodedCache
@@ -133,9 +135,16 @@ public struct CachedImageLoader: AssetLoader, Equatable {
             targetSize: targetSize
         )
 
-        // ④ Store decoded image so the next hit is instant
-        let expiration = AssetCacheConfiguration.default.defaultExpiration
-        decodedCache.store(platformImage, for: key, expiration: expiration)
+        // ④ Store decoded image so the next hit is instant.
+        // The expiration comes from the cache actually backing this loader, not
+        // from `AssetCacheConfiguration.default` — otherwise a custom
+        // configuration's expiration would be silently ignored here and decoded
+        // images would outlive the raw bytes they were decoded from.
+        decodedCache.store(
+            platformImage,
+            for: key,
+            expiration: assetCache.configuration.defaultExpiration
+        )
 
         return swiftUIImage(from: platformImage)
     }

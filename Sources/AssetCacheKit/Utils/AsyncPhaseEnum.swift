@@ -18,7 +18,20 @@ public enum AsyncPhase<Content>: Equatable {
     /// The operation has failed with an error.
     case failure(Error)
     
-    /// Compares two AsyncPhase values for equality.
+    /// Compares two `AsyncPhase` values **by case, not by payload**.
+    ///
+    /// - Important: Any two `.success` values compare equal regardless of the
+    ///   assets they carry, and any two `.failure` values compare equal when
+    ///   their `localizedDescription`s match.  `Content` is not constrained to
+    ///   `Equatable` — the framework's own assets (`Image`,
+    ///   `PDFKitRepresentedView`) do not conform — so the payload cannot be
+    ///   inspected here.
+    ///
+    ///   Do not use this operator to detect that a *different* asset finished
+    ///   loading, and do not feed an `AsyncPhase` to `onChange(of:)`,
+    ///   `.animation(_:value:)`, or any other API that suppresses work when
+    ///   values compare equal: a transition from one loaded asset to another
+    ///   would be dropped.
     public static func == (lhs: AsyncPhase<Content>, rhs: AsyncPhase<Content>) -> Bool {
         switch (lhs, rhs) {
         case (.empty, .empty):

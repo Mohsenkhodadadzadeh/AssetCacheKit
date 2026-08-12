@@ -53,7 +53,7 @@ enum NetworkFetcher {
                 return try await download(url: url)
             } catch {
                 attempt += 1
-                guard attempt < policy.maxAttempts else { throw error }
+                guard attempt < policy.maxAttempts, isRetryable(error) else { throw error }
                 try await sleep(seconds: delay)
                 delay *= policy.multiplier
             }
@@ -61,6 +61,59 @@ enum NetworkFetcher {
     }
 
     // MARK: - Private
+
+    /// Reports whether re-issuing the request could plausibly succeed.
+    ///
+    /// Backing off and trying again only helps for *transient* failures.  A
+    /// `404`, a malformed URL, or a cancelled task will fail identically on
+    /// every attempt, so retrying them just delays the error the caller is
+    /// already going to get — by 1.5 s under the default policy — while holding
+    /// the request open and burning battery.
+    private static func isRetryable(_ error: Error) -> Bool {
+        // Honour cooperative cancellation immediately.
+        if error is CancellationError { return false }
+
+        guard let appError = error as? AppError else {
+            // Unknown error shape — assume transient rather than failing early.
+            return true
+        }
+
+        switch appError {
+        case .network(let networkError):
+            switch networkError {
+            case .timeout,
+                 .noConnection,
+                 .cannotFindHost,
+                 .cannotConnectToHost,
+                 .networkConnectionLost,
+                 .dnsLookupFailed:
+                return true
+
+            case .badURL,
+                 .cancelled,
+                 .secureConnectionFailed,
+                 .userCancelledAuthentication,
+                 .appTransportSecurityRequiresSecureConnection:
+                return false
+
+            case .badServerResponse(let statusCode):
+                // A negative value is not an HTTP status at all: `network(from:)`
+                // funnels unmapped `URLError` codes (which are negative) through
+                // this same case, and those are transport failures worth
+                // retrying.
+                if statusCode < 0 { return true }
+                // 5xx and 408/429 are worth another attempt; other 4xx are not.
+                return statusCode >= 500 || statusCode == 408 || statusCode == 429
+            }
+
+        case .assetLoading:
+            // Malformed or undecodable payloads do not improve on a retry.
+            return false
+
+        case .unknown:
+            return true
+        }
+    }
 
     private static func download(url: URL) async throws -> Data {
         do {
